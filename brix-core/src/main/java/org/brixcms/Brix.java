@@ -75,6 +75,8 @@ public abstract class Brix {
     public static final String NS = "brix";
     public static final String NS_PREFIX = NS + ":";
 
+    public static final String FOLDER_HAS_PAGE_ENDING = "index.brix";
+
     public static final String WORKSPACE_ATTRIBUTE_TYPE = "brix:workspace-type";
 
     public static final String ROOT_NODE_NAME = NS_PREFIX + "root";

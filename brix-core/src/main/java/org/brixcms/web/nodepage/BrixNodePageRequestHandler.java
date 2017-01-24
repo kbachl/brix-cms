@@ -22,7 +22,9 @@ import org.apache.wicket.request.IRequestCycle;
 import org.apache.wicket.request.IRequestHandler;
 import org.apache.wicket.request.component.IRequestablePage;
 import org.apache.wicket.request.cycle.RequestCycle;
+import org.apache.wicket.request.http.handler.RedirectRequestHandler;
 import org.apache.wicket.request.mapper.parameter.PageParameters;
+import org.brixcms.Brix;
 import org.brixcms.jcr.wrapper.BrixNode;
 
 public class BrixNodePageRequestHandler extends RenderPageRequestHandler implements IRequestHandler, IPageRequestHandler,
@@ -71,7 +73,13 @@ public class BrixNodePageRequestHandler extends RenderPageRequestHandler impleme
         // return;
         // }
         // }
+        if(requestCycle.getRequest().getUrl().getPath().endsWith(Brix.FOLDER_HAS_PAGE_ENDING)) {
+            requestCycle.scheduleRequestHandlerAfterCurrent(new RedirectRequestHandler(
+                    BrixPageParameters.getCurrent().toCallbackURL().replace(Brix.FOLDER_HAS_PAGE_ENDING, "")
+            ));
+        } else {
 
+        }
         respondWithInitialRedirectHandled(requestCycle);
     }
 

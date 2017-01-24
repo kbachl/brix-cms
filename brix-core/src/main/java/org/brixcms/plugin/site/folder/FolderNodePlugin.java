@@ -17,17 +17,21 @@ package org.brixcms.plugin.site.folder;
 import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.ResourceModel;
+import org.apache.wicket.protocol.http.RequestUtils;
 import org.apache.wicket.request.IRequestHandler;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.core.request.handler.PageProvider;
 import org.apache.wicket.core.request.handler.RenderPageRequestHandler;
 import org.apache.wicket.request.http.handler.RedirectRequestHandler;
+import org.apache.wicket.request.mapper.parameter.PageParameters;
 import org.brixcms.Brix;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.NodeConverter;
 import org.brixcms.plugin.site.SimpleCallback;
 import org.brixcms.plugin.site.SiteNodePlugin;
 import org.brixcms.plugin.site.SitePlugin;
+import org.brixcms.plugin.site.page.PageRenderingPage;
+import org.brixcms.web.nodepage.BrixNodePageRequestHandler;
 import org.brixcms.web.nodepage.BrixPageParameters;
 import org.brixcms.web.nodepage.ForbiddenPage;
 import org.brixcms.web.reference.Reference;
@@ -70,7 +74,22 @@ public class FolderNodePlugin implements SiteNodePlugin {
         if (redirect != null && !redirect.isEmpty()) {
             IRequestHandler target = redirect.getRequestTarget();
             final CharSequence url = RequestCycle.get().urlFor(target);
-            return new RedirectRequestHandler(url.toString());
+            //Hardcoded catch for any "index.brix" ending URL
+            if(url.toString().endsWith(Brix.FOLDER_HAS_PAGE_ENDING)) {
+                PageParameters parameters = new PageParameters();
+                String queryString = RequestCycle.get().getRequest().getUrl().getQueryString();
+                if(queryString != null) {
+                    RequestUtils.decodeParameters(queryString, parameters);
+                }
+                //we now render the page here at once...
+                return new BrixNodePageRequestHandler(redirect.getNodeModel(),
+                        new PageRenderingPage(redirect.getNodeModel(), new BrixPageParameters(parameters)));
+            }
+
+
+
+            //return 301 for SEO! - todo: make dynamic to be chose system wide as 301 is dangerous if not used with care!
+            return new RedirectRequestHandler(url.toString(), 302);
         } else {
             return new RenderPageRequestHandler(new PageProvider(new ForbiddenPage(/*path*/)));
         }

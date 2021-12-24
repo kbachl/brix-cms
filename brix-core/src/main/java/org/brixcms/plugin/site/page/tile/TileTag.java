@@ -76,6 +76,9 @@ public class TileTag extends SimpleTag
      */
     public Component getComponent(String id, IModel<BrixNode> pageNodeModel) {
         AbstractContainer container = getTileContainer();
+        if(container == null) {
+            return null;
+        }
         BrixNode tileNode = container.getTileNode(tileName);
 
         if (tileNode != null) {

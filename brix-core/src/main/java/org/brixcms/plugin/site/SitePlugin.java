@@ -540,7 +540,15 @@ public class SitePlugin implements SessionAwarePlugin {
      */
     public Path getUriPathForNode(final BrixNode node) {
         // allow site plugin to translate jcr path into node path
-        final String jcrPath = SitePlugin.get().fromRealWebNodePath(node.getPath());
+        final String jcrPath;
+        if(node != null) {
+            jcrPath = SitePlugin.get().fromRealWebNodePath(node.getPath());
+        } else {
+            System.out.println("jcrPath is empty due to node null!");
+            jcrPath = "";
+        }
+
+
         final Path nodePath = new Path(jcrPath);
 
         // use urimapper to create the uri

@@ -46,7 +46,7 @@
 
 	<properties>
 		<!-- brix version is now set here -->
-		<revision>9.0.4</revision>
+		<revision>9.0.5</revision>
 		<changelist>-SNAPSHOT</changelist>
 
 		<maven.compiler.source>17</maven.compiler.source>
@@ -59,8 +59,8 @@
 		<deployment.disabled>false</deployment.disabled>
 		<sources.disabled>false</sources.disabled>
 
-		<wicket.version>9.16.0</wicket.version>
-		<inmethod.grid.version>9.16.0</inmethod.grid.version>
+		<wicket.version>9.18.0</wicket.version>
+		<inmethod.grid.version>9.18.0</inmethod.grid.version>
 		<jetty.version>9.4.53.v20231009</jetty.version>
 		<htmllexer.version>2.1</htmllexer.version>
 		<jackrabbit.version>2.20.3</jackrabbit.version>

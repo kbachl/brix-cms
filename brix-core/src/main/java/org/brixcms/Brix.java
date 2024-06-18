@@ -276,7 +276,7 @@ public abstract class Brix {
         cloneWorkspace(src, dest);
     }
 
-    private void cleanWorkspace(JcrSession session) {
+    public void cleanWorkspace(JcrSession session) {
         if (session.itemExists(getRootPath())) {
             JcrNode root = (JcrNode) session.getItem(getRootPath());
             root.remove();

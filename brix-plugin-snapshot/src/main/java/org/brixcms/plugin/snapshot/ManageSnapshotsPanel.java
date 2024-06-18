@@ -232,10 +232,15 @@ public class ManageSnapshotsPanel extends BrixGenericPanel<Workspace> {
                                 session.save();
                             }
 
-
-                            session.importXML("/", s,
+                            session.getWorkspace().importXML("/", s,
                                     ImportUUIDBehavior.IMPORT_UUID_COLLISION_REMOVE_EXISTING);
-                            session.save();
+
+
+//                            session.importXML("/", s,
+//                                    ImportUUIDBehavior.IMPORT_UUID_COLLISION_REMOVE_EXISTING);
+//                            session.save();
+                           // session.getWorkspace().getSession().save();
+
 
                             brix.initWorkspace(ManageSnapshotsPanel.this.getModelObject(), session);
 

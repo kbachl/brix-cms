@@ -108,12 +108,14 @@ class Streamer {
                 byte[] buf = new byte[howMuch];
                 int numRead = s.read(buf);
 
-                response.getOutputStream().write(buf, 0, numRead);
+                if(numRead > -1) {
+                    response.getOutputStream().write(buf, 0, numRead);
+                }
+
                 //only call flushBuffer if partial content delivery is active - saves roundtrip
                 if(isFlushingRequired) {
                     response.flushBuffer();
                 }
-
 
                 if (numRead == -1) {
                     break;

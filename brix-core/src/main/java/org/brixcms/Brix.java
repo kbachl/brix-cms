@@ -258,8 +258,7 @@ public abstract class Brix {
         // allow brix to handle any url that wicket cant
         // todo: make sure that BrixRequestMapper is changed so that it can work together with HttpsMapper, problem seems that
         // HttpsMapper wants the target class before it is decided which one to chose;
-        application.getRootRequestMapperAsCompound()
-                .add(new BrixRequestMapper(this, getHttpsConfig()));
+        attachRequestMapper(application);
 
 
         // application.mount(new BrixNodePageUrlMapper());
@@ -269,6 +268,11 @@ public abstract class Brix {
         BrixExtensionStringResourceLoader loader = new BrixExtensionStringResourceLoader();
         application.getResourceSettings().getStringResourceLoaders().add(loader);
         config.getRegistry().register(loader, true);
+    }
+
+    public void attachRequestMapper(WebApplication application) {
+        application.getRootRequestMapperAsCompound()
+                .add(new BrixRequestMapper(this, getHttpsConfig()));
     }
 
     public void clone(JcrSession src, JcrSession dest) {

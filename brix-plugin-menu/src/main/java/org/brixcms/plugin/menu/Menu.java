@@ -180,7 +180,7 @@ public class Menu implements IDetachable {
         }
 
         public static enum MenuType {
-            REFERENCE, LABEL, CODE
+            REFERENCE, LABEL, CODE, RAW_CODE
         }
 
         private MenuType menuType;

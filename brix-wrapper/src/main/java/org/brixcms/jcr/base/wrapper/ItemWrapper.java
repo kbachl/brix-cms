@@ -101,6 +101,8 @@ abstract class ItemWrapper extends BaseWrapper<Item> implements Item {
     }
 
     public void refresh(boolean keepChanges) throws RepositoryException {
+        path = null;
+        name = null;
         getActionHandler().beforeItemRefresh(this, keepChanges);
         getDelegate().refresh(keepChanges);
         getActionHandler().afterItemRefresh(this, keepChanges);

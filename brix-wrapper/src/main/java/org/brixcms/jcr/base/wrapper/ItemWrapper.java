@@ -44,15 +44,22 @@ abstract class ItemWrapper extends BaseWrapper<Item> implements Item {
     }
 
 
+    private String path;
 
     public String getPath() throws RepositoryException {
-        // TODO: Cache
-        return getDelegate().getPath();
+        if (path == null) {
+            path = getDelegate().getPath();
+        }
+        return path;
     }
 
+    private String name;
+
     public String getName() throws RepositoryException {
-        // TODO: Cache
-        return getDelegate().getName();
+        if( name == null) {
+            name = getDelegate().getName();
+        }
+        return name;
     }
 
     public Item getAncestor(int depth) throws RepositoryException {

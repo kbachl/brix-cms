@@ -55,22 +55,31 @@ abstract class ItemWrapper extends AbstractWrapper implements JcrItem {
         return getPath();
     }
 
+    private String path;
+
     public String getPath() {
-        return executeCallback(new Callback<String>() {
-            public String execute() throws Exception {
-                return getDelegate().getPath();
-            }
-        });
+        if(path == null) {
+            path = executeCallback(new Callback<String>() {
+                public String execute() throws Exception {
+                    return getDelegate().getPath();
+                }
+            });
+        }
+        return path;
     }
 
 
+    private String name;
 
     public String getName() {
-        return executeCallback(new Callback<String>() {
-            public String execute() throws Exception {
-                return getDelegate().getName();
-            }
-        });
+        if(name == null) {
+            name = executeCallback(new Callback<String>() {
+                public String execute() throws Exception {
+                    return getDelegate().getName();
+                }
+            });
+        }
+        return name;
     }
 
     public JcrItem getAncestor(final int depth) {
@@ -146,6 +155,8 @@ abstract class ItemWrapper extends AbstractWrapper implements JcrItem {
     }
 
     public void refresh(final boolean keepChanges) {
+        path = null;
+        name = null;
         executeCallback(new VoidCallback() {
             public void execute() throws Exception {
                 getDelegate().refresh(keepChanges);

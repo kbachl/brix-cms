@@ -108,7 +108,7 @@ public class ApplicationProperties {
      */
     public String getJcrRepositoryUrl() {
         String url = properties.getProperty(prefix + ".jcr.url");
-        if (url == null || url.trim().length() == 0) {
+        if (url == null || url.trim().isEmpty()) {
             // if no url was specified generate a unique temporary one
             url = "file://" + getDefaultRepositoryFileName();
             properties.setProperty(prefix + ".jcr.url", url);

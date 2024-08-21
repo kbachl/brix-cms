@@ -26,6 +26,8 @@ import org.apache.wicket.request.http.WebRequest;
 import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.string.Strings;
 import org.brixcms.Brix;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WorkspaceUtils {
 
@@ -36,6 +38,7 @@ public class WorkspaceUtils {
     public static final MetaDataKey<String> WORKSPACE_METADATA = new MetaDataKey<String>() {
         private static final long serialVersionUID = 1L;
     };
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceUtils.class);
 
     public static String getWorkspace() {
         String workspace = getWorkspaceFromUrl();
@@ -96,9 +99,9 @@ public class WorkspaceUtils {
             for (String s : params) {
                 try {
                     s = URLDecoder.decode(s, "utf-8");
-                } catch (UnsupportedEncodingException e) {
-                    // rrright
-                    throw new RuntimeException(e);
+                } catch (Exception e) {
+                    //we just swallow it here since it's just the referer....
+                    //log.debug("UnsupportedEncodingException from referer URL", e);
                 }
                 if (s.startsWith(WORKSPACE_PARAM + "=")) {
                     String value = s.substring(WORKSPACE_PARAM.length() + 1);

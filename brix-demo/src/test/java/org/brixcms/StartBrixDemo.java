@@ -4,7 +4,7 @@ import java.lang.management.ManagementFactory;
 
 import javax.management.MBeanServer;
 
-import org.eclipse.jetty.jmx.MBeanContainer;
+import org.eclipse.jetty.ee10.webapp.WebAppContext;
 import org.eclipse.jetty.server.HttpConfiguration;
 import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.SecureRequestCustomizer;
@@ -13,7 +13,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.util.resource.Resource;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
-import org.eclipse.jetty.webapp.WebAppContext;
+
 
 public class StartBrixDemo {
 
@@ -34,6 +34,8 @@ public class StartBrixDemo {
         server.addConnector(http);
 
         Resource keystore = Resource.newClassPathResource("/keystore");
+
+
         if (keystore != null && keystore.exists()) {
             // if a keystore for a SSL certificate is available, start a SSL
             // connector on port 8443.
@@ -42,7 +44,7 @@ public class StartBrixDemo {
             // use this certificate anywhere important as the passwords are
             // available in the source.
 
-            SslContextFactory sslContextFactory = new SslContextFactory();
+            SslContextFactory sslContextFactory = new SslContextFactory(true) {};
             sslContextFactory.setKeyStoreResource(keystore);
             sslContextFactory.setKeyStorePassword("wicket");
             sslContextFactory.setKeyManagerPassword("wicket");

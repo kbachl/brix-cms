@@ -16,11 +16,11 @@ package org.brixcms.plugin.site.picker.reference;
 
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.core.request.handler.IPartialPageRequestHandler;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.ResourceModel;
 import org.brixcms.web.generic.IGenericComponent;
 import org.brixcms.web.reference.Reference;
+import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class ReferenceEditorModalWindow extends ModalWindow implements IGenericComponent<Reference> {
     private final ReferenceEditorConfiguration configuration;

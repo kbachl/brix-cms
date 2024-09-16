@@ -17,13 +17,13 @@ package org.brixcms.plugin.site.picker.reference;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
 import org.brixcms.web.reference.Reference;
 import org.brixcms.web.util.DisabledClassAppender;
+import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class ReferenceEditorPanel extends FormComponentPanel<Reference> {
     protected static final String MODAL_WINDOW_ID = "modalWindow";

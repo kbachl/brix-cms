@@ -14,12 +14,11 @@
 
 package org.brixcms.web.nodepage;
 
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.wicket.markup.html.WebPage;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.request.http.WebResponse;
-import org.brixcms.Brix;
 import org.brixcms.web.nodepage.toolbar.ToolbarBehavior;
 import org.brixcms.workspace.WorkspaceUtils;
 

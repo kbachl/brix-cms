@@ -14,12 +14,11 @@
 
 package org.brixcms.workspace;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 
-import javax.servlet.http.Cookie;
-import javax.servlet.http.HttpServletRequest;
 
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import org.apache.wicket.MetaDataKey;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebRequest;

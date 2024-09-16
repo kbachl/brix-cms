@@ -51,14 +51,14 @@
 		</testResources>
 		<plugins>
 			<plugin>
-				<groupId>org.eclipse.jetty</groupId>
-    			<artifactId>jetty-maven-plugin</artifactId>
-				<version>9.4.53.v20231009</version>
+				<groupId>org.eclipse.jetty.ee10</groupId>
+    			<artifactId>jetty-ee10-maven-plugin</artifactId>
+				<version>12.0.13</version>
 				<dependencies>
 					<dependency>
-						<groupId>javax.servlet</groupId>
-						<artifactId>javax.servlet-api</artifactId>
-						<version>3.1.0</version>
+						<groupId>jakarta.servlet</groupId>
+						<artifactId>jakarta.servlet-api</artifactId>
+						<version>5.0.0</version>
 					</dependency>
 				</dependencies>
 				<configuration>
@@ -123,6 +123,11 @@
 		<!--</dependency> -->
 
 		<dependency>
+			<groupId>jakarta.servlet</groupId>
+			<artifactId>jakarta.servlet-api</artifactId>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
 			<groupId>org.apache.wicket</groupId>
 			<artifactId>wicket</artifactId>
 			<type>pom</type>
@@ -141,9 +146,14 @@
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.eclipse.jetty.aggregate</groupId>
-			<artifactId>jetty-all</artifactId>
-			<classifier>uber</classifier>
+			<groupId>org.eclipse.jetty</groupId>
+			<artifactId>jetty-server</artifactId>
+			<version>12.0.13</version>
+		</dependency>
+		<dependency>
+			<groupId>org.eclipse.jetty.ee10</groupId>
+			<artifactId>jetty-ee10-webapp</artifactId>
+			<version>12.0.13</version>
 		</dependency>
 		<!--+ | LOGGING + -->
 		<dependency>

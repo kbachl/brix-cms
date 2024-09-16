@@ -19,8 +19,8 @@ import java.io.InputStream;
 import java.util.List;
 
 import javax.jcr.ImportUUIDBehavior;
-import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletOutputStream;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.wicket.AttributeModifier;
 import org.apache.wicket.markup.html.basic.Label;

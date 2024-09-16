@@ -22,7 +22,6 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
 import org.apache.wicket.model.PropertyModel;
 import org.apache.wicket.model.ResourceModel;
-import org.apache.wicket.util.collections.MicroMap;
 import org.brixcms.BrixNodeModel;
 import org.brixcms.jcr.wrapper.BrixFileNode;
 import org.brixcms.jcr.wrapper.BrixNode;
@@ -33,6 +32,8 @@ import org.brixcms.web.BrixFeedbackPanel;
 import org.brixcms.web.generic.BrixGenericPanel;
 import org.brixcms.web.model.ModelBuffer;
 import org.brixcms.web.util.validators.NodeNameValidator;
+
+import java.util.Map;
 
 public class CreateTextResourcePanel extends BrixGenericPanel<BrixNode> {
     private String fileName;
@@ -57,7 +58,7 @@ public class CreateTextResourcePanel extends BrixGenericPanel<BrixNode> {
             @Override
             public void onSubmit() {
                 if (getContainer().hasNode(fileName)) {
-                    error(getString("fileExists", Model.ofMap(new MicroMap<String, String>(
+                    error(getString("fileExists", Model.ofMap(Map.of(
                             "fileName", fileName))));
                     return;
                 }

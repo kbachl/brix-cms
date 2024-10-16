@@ -37,7 +37,7 @@ public class TimeTile implements Tile {
     }
 
     public Component newViewer(String id, IModel<BrixNode> tileNode) {
-        return new TimeLabel(id, tileNode).setRenderBodyOnly(true);
+        return new TimeLabel(id, tileNode);
     }
 
     public boolean requiresSSL(IModel<BrixNode> tileNode) {

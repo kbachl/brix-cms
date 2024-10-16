@@ -14,6 +14,7 @@
 
 package org.brixcms.demo.web.tile.time;
 
+import org.apache.wicket.ajax.AjaxSelfUpdatingTimerBehavior;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.model.IModel;
 import org.brixcms.jcr.api.JcrNode;
@@ -21,6 +22,7 @@ import org.brixcms.jcr.wrapper.BrixNode;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.time.Duration;
 import java.util.Date;
 
 /**
@@ -39,6 +41,9 @@ public class TimeLabel extends Label {
      */
     public TimeLabel(String id, IModel<BrixNode> nodeModel) {
         super(id, new TimeStringModel(nodeModel));
+        setOutputMarkupId(true);
+        setRenderBodyOnly(false);
+        add(new AjaxSelfUpdatingTimerBehavior(Duration.ofSeconds(1)));
     }
 
     /**

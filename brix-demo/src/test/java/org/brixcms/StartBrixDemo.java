@@ -42,7 +42,7 @@ public class StartBrixDemo {
             // use this certificate anywhere important as the passwords are
             // available in the source.
 
-            SslContextFactory sslContextFactory = new SslContextFactory();
+            SslContextFactory.Server sslContextFactory = new SslContextFactory.Server();
             sslContextFactory.setKeyStoreResource(keystore);
             sslContextFactory.setKeyStorePassword("wicket");
             sslContextFactory.setKeyManagerPassword("wicket");
@@ -83,7 +83,6 @@ public class StartBrixDemo {
 
         MBeanServer mBeanServer = ManagementFactory.getPlatformMBeanServer();
         MBeanContainer mBeanContainer = new MBeanContainer(mBeanServer);
-        server.addEventListener(mBeanContainer);
         server.addBean(mBeanContainer);
 
         try {

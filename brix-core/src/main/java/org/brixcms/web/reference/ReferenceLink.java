@@ -17,7 +17,10 @@ package org.brixcms.web.reference;
 import org.apache.wicket.markup.ComponentTag;
 import org.apache.wicket.markup.html.link.AbstractLink;
 
+import java.io.Serial;
+
 public class ReferenceLink extends AbstractLink {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final Reference reference;

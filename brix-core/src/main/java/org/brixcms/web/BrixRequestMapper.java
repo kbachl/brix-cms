@@ -21,7 +21,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.wicket.Application;
 import org.apache.wicket.Component;
@@ -116,8 +116,8 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         // root path handling
         if (path.isRoot()) {
             node = getNodeForUriPath(path);
-            if(node instanceof FolderNode) {
-                node = ((FolderNode) node).getRedirectReference().getNodeModel().getObject();
+            if(node instanceof FolderNode folderNode) {
+                node = folderNode.getRedirectReference().getNodeModel().getObject();
             }
         }
 
@@ -157,9 +157,8 @@ public class BrixRequestMapper extends AbstractComponentMapper {
 
             if (info.getComponentInfo() == null) {
                 PageProvider provider;
-                if (handler instanceof BrixNodePageRequestHandler) {
+                if (handler instanceof BrixNodePageRequestHandler brixNodePageRequestHandler) {
                     provider = new PageProvider(info.getPageInfo().getPageId(), BrixNodeWebPage.class, renderCount);
-                    BrixNodePageRequestHandler brixNodePageRequestHandler = (BrixNodePageRequestHandler) handler;
                     final IPageProvider pageProviderAdapter = brixNodePageRequestHandler.getPageProvider();
                     provider.setPageSource(new IPageSource() {
                         @Override
@@ -292,12 +291,10 @@ public class BrixRequestMapper extends AbstractComponentMapper {
 
     @Override
     public Url mapHandler(IRequestHandler requestHandler) {
-        if (requestHandler instanceof BrixNodeRequestHandler) {
-            BrixNodeRequestHandler handler = (BrixNodeRequestHandler) requestHandler;
+        if (requestHandler instanceof BrixNodeRequestHandler handler) {
             String nodeURL = handler.getNodeURL();
             return encode(nodeURL, handler.getPageParameters(), null);
-        } else if (requestHandler instanceof ListenerRequestHandler) {
-            ListenerRequestHandler handler = (ListenerRequestHandler) requestHandler;
+        } else if (requestHandler instanceof ListenerRequestHandler handler) {
             if (handler.getPage() instanceof BrixNodeWebPage) {
                 BrixNodeWebPage page = (BrixNodeWebPage) handler.getPage();
                 String componentPath = handler.getComponentPath();
@@ -310,8 +307,7 @@ public class BrixRequestMapper extends AbstractComponentMapper {
             } else {
                 return null;
             }
-        } else if (requestHandler instanceof RenderPageRequestHandler) {
-            RenderPageRequestHandler handler = (RenderPageRequestHandler) requestHandler;
+        } else if (requestHandler instanceof RenderPageRequestHandler handler) {
             if (handler.getPage() instanceof BrixNodeWebPage) {
                 BrixNodeWebPage page = (BrixNodeWebPage) handler.getPage();
                 PageInfo i = new PageInfo(page.getPageId());
@@ -323,8 +319,7 @@ public class BrixRequestMapper extends AbstractComponentMapper {
             } else {
                 return null;
             }
-        } else if (requestHandler instanceof BookmarkableListenerRequestHandler) {
-            BookmarkableListenerRequestHandler handler = (BookmarkableListenerRequestHandler) requestHandler;
+        } else if (requestHandler instanceof BookmarkableListenerRequestHandler handler) {
             if (handler.getPage() instanceof BrixNodeWebPage) {
                 BrixNodeWebPage page = (BrixNodeWebPage) handler.getPage();
                 Integer renderCount = null;
@@ -571,8 +566,8 @@ public class BrixRequestMapper extends AbstractComponentMapper {
      * @return {@link org.apache.wicket.protocol.https.Scheme}
      */
     protected Scheme getDesiredSchemeFor(IRequestHandler handler) {
-        if (handler instanceof BrixNodePageRequestHandler) {
-            BrixNode.Protocol protocol = ((BrixNodePageRequestHandler) handler).getPage().getPageNode().getRequiredProtocol();
+        if (handler instanceof BrixNodePageRequestHandler requestHandler) {
+            BrixNode.Protocol protocol = requestHandler.getPage().getPageNode().getRequiredProtocol();
             switch (protocol) {
             case HTTP:
                 return Scheme.HTTP;

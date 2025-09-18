@@ -17,6 +17,7 @@ package org.brixcms.plugin.site.admin.nodetree;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.jcr.wrapper.ResourceNode;
 
+import java.io.Serial;
 import java.util.Arrays;
 import java.util.List;
 
@@ -26,6 +27,7 @@ import java.util.List;
  * @author Jeremy Thomerson
  */
 public abstract class AbstractMimeTypeTreeRenderer extends AbstractNodeTreeRenderer {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private final List<String> mimeTypes;

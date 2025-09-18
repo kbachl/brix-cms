@@ -141,9 +141,9 @@ public abstract class AbstractWicketApplication extends WebApplication {
     @Override
     protected void onDestroy() {
         // shutdown the repository cleanly
-        if (repository instanceof RepositoryImpl) {
+        if (repository instanceof RepositoryImpl impl) {
             logger.info("Shutting down JackRabbit repository...");
-            ((RepositoryImpl) repository).shutdown();
+            impl.shutdown();
         }
         super.onDestroy();
     }

@@ -66,8 +66,8 @@ public abstract class AbstractContainer extends BrixFileNode
         VariableTransformer transfomer = new VariableTransformer(source, this);
         Item i = transfomer.nextMarkupItem();
         while (i != null) {
-            if (i instanceof VariableKeyProvider) {
-                Collection<String> k = ((VariableKeyProvider) i).getVariableKeys();
+            if (i instanceof VariableKeyProvider provider) {
+                Collection<String> k = provider.getVariableKeys();
                 if (k != null) {
                     keys.addAll(k);
                 }
@@ -156,8 +156,8 @@ public abstract class AbstractContainer extends BrixFileNode
         PageMarkupSource source = new PageMarkupSource(this);
         Item i = source.nextMarkupItem();
         while (i != null) {
-            if (i instanceof TileTag) {
-                keys.add(((TileTag) i).getTileName());
+            if (i instanceof TileTag tag) {
+                keys.add(tag.getTileName());
             }
             i = source.nextMarkupItem();
         }

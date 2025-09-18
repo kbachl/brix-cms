@@ -21,9 +21,12 @@ import org.apache.wicket.request.Request;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.brixcms.web.generic.BrixGenericPanel;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
+
+import java.io.Serial;
 
 public class WebdavUrlPanel extends BrixGenericPanel<String> {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public WebdavUrlPanel(String id, IModel<String> model) {

@@ -109,8 +109,8 @@ public class TileTag extends SimpleTag
         if (tileNode != null) {
             Tile tile = Tile.Helper.getTileOfType(TileContainerFacet.getTileClassName(tileNode),
                     tileNode.getBrix());
-            if (tile instanceof VariableKeyProvider) {
-                return ((VariableKeyProvider) tile).getVariableKeys();
+            if (tile instanceof VariableKeyProvider provider) {
+                return provider.getVariableKeys();
             }
         }
         return null;

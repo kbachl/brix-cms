@@ -36,8 +36,8 @@ public class NodePathValidator implements IValidator {
         if (o != null) {
             JcrNode node = nodeModel.getObject();
             Path path = null;
-            if (o instanceof Path) {
-                path = (Path) o;
+            if (o instanceof Path path1) {
+                path = path1;
             } else {
                 path = new Path(o.toString());
             }

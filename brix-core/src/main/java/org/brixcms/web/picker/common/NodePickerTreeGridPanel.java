@@ -159,8 +159,8 @@ public abstract class NodePickerTreeGridPanel extends Panel {
 
     private BrixNode getNode(IModel<?> model) {
         Object object = model.getObject();
-        if (object instanceof JcrTreeNode) {
-            IModel<BrixNode> nodeModel = ((JcrTreeNode) object).getNodeModel();
+        if (object instanceof JcrTreeNode node) {
+            IModel<BrixNode> nodeModel = node.getNodeModel();
             return nodeModel != null ? nodeModel.getObject() : null;
         } else {
             return null;
@@ -261,8 +261,7 @@ public abstract class NodePickerTreeGridPanel extends Panel {
 
         @Override
         protected CharSequence convertToString(Object object) {
-            if (object instanceof Date) {
-                Date date = (Date) object;
+            if (object instanceof Date date) {
                 return DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(date);
             } else {
                 return null;

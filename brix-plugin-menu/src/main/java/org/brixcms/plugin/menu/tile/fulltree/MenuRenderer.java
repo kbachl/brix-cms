@@ -26,6 +26,7 @@ import org.brixcms.plugin.menu.Menu.ChildEntry;
 import org.brixcms.plugin.menu.tile.AbstractMenuRenderer;
 import org.brixcms.plugin.site.SitePlugin;
 
+import java.io.Serial;
 import java.util.List;
 import java.util.Set;
 
@@ -35,6 +36,7 @@ import java.util.Set;
  * @author igor.vaynberg
  */
 public class MenuRenderer extends AbstractMenuRenderer {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**

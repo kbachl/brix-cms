@@ -48,8 +48,8 @@ public class TextNodeTabFactory implements ManageNodeTabFactory {
         List<IBrixTab> result = new ArrayList<IBrixTab>();
 
         BrixNode node = nodeModel.getObject();
-        if (node instanceof ResourceNode && hasViewPermission(nodeModel)) {
-            if (BrixFileNode.isText((ResourceNode) node)) {
+        if (node instanceof ResourceNode resourceNode && hasViewPermission(nodeModel)) {
+            if (BrixFileNode.isText(resourceNode)) {
                 result.add(getViewTab(nodeModel));
             }
         }

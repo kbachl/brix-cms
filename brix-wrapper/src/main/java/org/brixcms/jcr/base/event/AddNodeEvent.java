@@ -34,8 +34,7 @@ public class AddNodeEvent extends NodeEvent {
 
     @Override
     Event onNewEvent(Event event, QueueCallback queueCallback) throws RepositoryException {
-        if (event instanceof BeforeRemoveNodeEvent) {
-            BeforeRemoveNodeEvent e = (BeforeRemoveNodeEvent) event;
+        if (event instanceof BeforeRemoveNodeEvent e) {
             if (getNewNode().getPath().equals(e.getNode().getPath())) {
                 // we are removing same node as we have added. Thus it is
                 // not necessary to add the remove event to queue

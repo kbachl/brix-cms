@@ -17,7 +17,6 @@ package org.brixcms.web.picker.node;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.model.IModel;
@@ -28,6 +27,7 @@ import org.brixcms.plugin.site.SitePlugin;
 import org.brixcms.web.tree.JcrTreeNode;
 import org.brixcms.web.tree.NodeFilter;
 import org.brixcms.web.util.DisabledClassAppender;
+import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class NodePickerPanel extends FormComponentPanel<BrixNode> {
     protected static final String MODAL_WINDOW_ID = "modalWindow";

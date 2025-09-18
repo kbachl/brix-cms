@@ -20,8 +20,8 @@ import javax.jcr.Session;
 
 public class WrapperAccessor {
     public static BrixSession wrap(Session session) {
-        if (session instanceof SessionWrapper) {
-            return (SessionWrapper) session;
+        if (session instanceof SessionWrapper wrapper) {
+            return wrapper;
         } else {
             return SessionWrapper.wrap(session);
         }

@@ -29,12 +29,14 @@ import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrNodeIterator;
 import org.brixcms.jcr.wrapper.BrixNode;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
 public class GuestBookPanel extends Panel {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public GuestBookPanel(String id, IModel<BrixNode> model) {
@@ -42,7 +44,7 @@ public class GuestBookPanel extends Panel {
         add(new FeedbackPanel("feedback"));
         add(new MessageForm("form"));
         add(new PropertyListView<Entry>("entries", new EntriesModel()) {
-            private static final long serialVersionUID = 1L;
+            @Serial private static final long serialVersionUID = 1L;
 
             @Override
             protected void populateItem(ListItem<Entry> item) {
@@ -65,6 +67,7 @@ public class GuestBookPanel extends Panel {
     }
 
     private class MessageForm extends Form<Entry> {
+        @Serial
         private static final long serialVersionUID = 1L;
 
         private Entry entry = new Entry();
@@ -85,6 +88,7 @@ public class GuestBookPanel extends Panel {
     }
 
     private static class Entry implements Serializable {
+        @Serial
         private static final long serialVersionUID = 1L;
 
         public String name;
@@ -93,6 +97,7 @@ public class GuestBookPanel extends Panel {
     }
 
     private class EntriesModel extends LoadableDetachableModel<List<Entry>> {
+        @Serial
         private static final long serialVersionUID = 1L;
 
         @Override

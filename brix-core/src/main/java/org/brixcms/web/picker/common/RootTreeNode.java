@@ -51,8 +51,8 @@ public class RootTreeNode implements JcrTreeNode {
         JcrNodeIterator iterator = root.getNodes();
         while (iterator.hasNext()) {
             BrixNode node = (BrixNode) iterator.nextNode();
-            if (node instanceof TreeAwareNode) {
-                JcrTreeNode treeNode = ((TreeAwareNode) node).getTreeNode(node);
+            if (node instanceof TreeAwareNode awareNode) {
+                JcrTreeNode treeNode = awareNode.getTreeNode(node);
                 if (treeNode != null) {
                     children.add(treeNode);
                 }

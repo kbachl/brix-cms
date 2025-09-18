@@ -18,12 +18,15 @@ import org.apache.wicket.extensions.markup.html.tree.BaseTree;
 import org.apache.wicket.request.resource.ResourceReference;
 import org.apache.wicket.request.resource.SharedResourceReference;
 
+import java.io.Serial;
+
 /**
  * Renderer for office spreadsheet nodes
  *
  * @author Jeremy Thomerson
  */
 public class OfficeSpreadsheetNodeTreeRenderer extends AbstractMimeTypeTreeRenderer {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private static final ResourceReference RESOURCE = new SharedResourceReference(

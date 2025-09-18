@@ -26,14 +26,14 @@ abstract class ItemWrapper extends BaseWrapper<Item> implements Item {
     public static ItemWrapper wrap(Item item, SessionWrapper session) {
         if (item == null) {
             return null;
-        } else if (item instanceof Version) {
-            return VersionWrapper.wrap((Version) item, session);
-        } else if (item instanceof VersionHistory) {
-            return VersionHistoryWrapper.wrap((VersionHistory) item, session);
-        } else if (item instanceof Node) {
-            return NodeWrapper.wrap((Node) item, session);
-        } else if (item instanceof Property) {
-            return PropertyWrapper.wrap((Property) item, session);
+        } else if (item instanceof Version version) {
+            return VersionWrapper.wrap(version, session);
+        } else if (item instanceof VersionHistory history) {
+            return VersionHistoryWrapper.wrap(history, session);
+        } else if (item instanceof Node node) {
+            return NodeWrapper.wrap(node, session);
+        } else if (item instanceof Property property) {
+            return PropertyWrapper.wrap(property, session);
         } else {
             throw new IllegalStateException("Unknown item subclass");
         }

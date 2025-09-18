@@ -41,8 +41,7 @@ public class MoveNodeEvent extends NodeEvent {
 
     @Override
     Event onNewEvent(Event event, QueueCallback callback) throws RepositoryException {
-        if (event instanceof MoveNodeEvent) {
-            MoveNodeEvent e = (MoveNodeEvent) event;
+        if (event instanceof MoveNodeEvent e) {
             if (e.getNode().getPath().equals(getNode().getPath())) {
                 callback.blockAddingEvent();
                 return this;

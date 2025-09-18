@@ -33,14 +33,14 @@ abstract class ItemWrapper extends AbstractWrapper implements JcrItem {
     public static JcrItem wrap(Item delegate, JcrSession session) {
         if (delegate == null) {
             return null;
-        } else if (delegate instanceof Version) {
-            return VersionWrapper.wrap((Version) delegate, session);
-        } else if (delegate instanceof VersionHistory) {
-            return VersionHistoryWrapper.wrap((VersionHistory) delegate, session);
-        } else if (delegate instanceof Node) {
-            return NodeWrapper.wrap((Node) delegate, session);
-        } else if (delegate instanceof Property) {
-            return PropertyWrapper.wrap((Property) delegate, session);
+        } else if (delegate instanceof Version version) {
+            return VersionWrapper.wrap(version, session);
+        } else if (delegate instanceof VersionHistory history) {
+            return VersionHistoryWrapper.wrap(history, session);
+        } else if (delegate instanceof Node node) {
+            return NodeWrapper.wrap(node, session);
+        } else if (delegate instanceof Property property) {
+            return PropertyWrapper.wrap(property, session);
         } else {
             throw new IllegalStateException("Unknown Item subclass.");
         }

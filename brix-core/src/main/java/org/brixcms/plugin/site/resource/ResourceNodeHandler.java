@@ -21,8 +21,8 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.util.Date;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.request.IRequestCycle;
@@ -30,7 +30,6 @@ import org.apache.wicket.request.IRequestHandler;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.string.Strings;
-import org.apache.wicket.util.time.Time;
 import org.brixcms.Brix;
 import org.brixcms.auth.Action;
 import org.brixcms.jcr.wrapper.BrixFileNode;

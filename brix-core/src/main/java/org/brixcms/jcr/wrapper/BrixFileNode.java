@@ -60,8 +60,8 @@ public class BrixFileNode extends BrixNode {
     public static BrixFileNode initialize(JcrNode node, String mimeType) {
         if (node.isNodeType("nt:file") == false) {
             throw new IllegalStateException("Argument 'node' must have JCR type nt:file.");
-        } else if (node instanceof BrixFileNode) {
-            return (BrixFileNode) node;
+        } else if (node instanceof BrixFileNode fileNode) {
+            return fileNode;
         }
         node.addNode("jcr:content", "nt:resource");
         BrixFileNode wrapped = new BrixFileNode(node.getDelegate(), node.getSession());

@@ -125,8 +125,8 @@ public abstract class NewTileFragment extends BrixGenericFragment<BrixNode> {
     protected abstract void onAddTile(String tileId, String ntileTypeName);
 
     public TileEditorPanel getEditor() {
-        if (newTileEditor instanceof TileEditorPanel) {
-            return (TileEditorPanel) newTileEditor;
+        if (newTileEditor instanceof TileEditorPanel panel) {
+            return panel;
         } else {
             return null;
         }

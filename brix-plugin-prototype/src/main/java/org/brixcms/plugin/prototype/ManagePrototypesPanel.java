@@ -19,8 +19,6 @@ import java.util.List;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.ajax.markup.html.form.AjaxButton;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow.WindowClosedCallback;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.TextField;
@@ -46,6 +44,7 @@ import org.brixcms.web.BrixFeedbackPanel;
 import org.brixcms.web.generic.BrixGenericPanel;
 import org.brixcms.workspace.Workspace;
 import org.brixcms.workspace.WorkspaceModel;
+import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
     private String prototypeName;
@@ -157,7 +156,7 @@ public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
                         ManagePrototypesPanel.this.prototypeName);
                 modalWindow.setContent(panel);
                 modalWindow.setTitle(new ResourceModel("selectItemsToCreate"));
-                modalWindow.setWindowClosedCallback(new WindowClosedCallback() {
+                modalWindow.setWindowClosedCallback(new ModalWindow.WindowClosedCallback() {
                     public void onClose(AjaxRequestTarget target) {
                         target.add(ManagePrototypesPanel.this);
                     }

@@ -24,7 +24,10 @@ import org.apache.wicket.util.string.Strings;
 import org.brixcms.Brix;
 import org.brixcms.jcr.wrapper.BrixNode;
 
+import java.io.Serial;
+
 public class BrixPageParameters extends PageParameters {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public static BrixPageParameters getCurrent() {
@@ -32,8 +35,8 @@ public class BrixPageParameters extends PageParameters {
         // this is required for getting current page parameters from page
         // constructor
         // (the actual page instance is not constructed yet.
-        if (target instanceof PageParametersRequestHandler) {
-            return ((PageParametersRequestHandler) target).getPageParameters();
+        if (target instanceof PageParametersRequestHandler handler) {
+            return handler.getPageParameters();
         } else {
             return new BrixPageParameters(Brix.getCurrentPage().getPageParameters());
         }
@@ -79,8 +82,8 @@ public class BrixPageParameters extends PageParameters {
      * @return url
      */
     public String urlFor(WebPage page) {
-        if (page instanceof BrixNodeWebPage) {
-            IRequestHandler target = new BrixNodeRequestHandler((BrixNodeWebPage) page, this);
+        if (page instanceof BrixNodeWebPage webPage) {
+            IRequestHandler target = new BrixNodeRequestHandler(webPage, this);
             return RequestCycle.get().urlFor(target).toString();
         }
         return RequestCycle.get().urlFor(page.getClass(), this).toString();

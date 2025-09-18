@@ -72,8 +72,8 @@ public class FilteredJcrTreeNode implements JcrTreeNode {
         }
 
         JcrTreeNode that;
-        if (obj instanceof FilteredJcrTreeNode) {
-            that = ((FilteredJcrTreeNode) obj).delegate;
+        if (obj instanceof FilteredJcrTreeNode node) {
+            that = node.delegate;
         } else {
             that = (JcrTreeNode) obj;
         }

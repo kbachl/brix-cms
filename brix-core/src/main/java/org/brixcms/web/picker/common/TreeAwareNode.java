@@ -33,8 +33,8 @@ public interface TreeAwareNode extends JcrNode {
         public static JcrTreeNode getTreeNode(BrixNode node, NodeFilter filter) {
             BrixNode n = node;
             while (n.getDepth() > 0) {
-                if (n instanceof TreeAwareNode) {
-                    JcrTreeNode result = ((TreeAwareNode) n).getTreeNode(node);
+                if (n instanceof TreeAwareNode awareNode) {
+                    JcrTreeNode result = awareNode.getTreeNode(node);
                     if (result != null) {
                         if (filter != null) {
                             result = new FilteredJcrTreeNode(result, filter);

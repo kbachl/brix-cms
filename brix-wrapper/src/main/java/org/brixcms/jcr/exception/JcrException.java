@@ -16,10 +16,13 @@ package org.brixcms.jcr.exception;
 
 import javax.jcr.RepositoryException;
 
+import java.io.Serial;
+
 /**
  * @author Matej Knopp
  */
 public class JcrException extends RuntimeException {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public JcrException(RepositoryException cause) {

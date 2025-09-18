@@ -56,8 +56,7 @@ public class VariableTag implements Tag, VariableKeyProvider {
     public Map<String, String> getAttributeMap() {
         Map<String, String> original = getDelegate().getAttributeMap();
         BrixNode pageNode = new BrixNodeModel(pageNodeModel).getObject();
-        if (pageNode instanceof VariableValueProvider) {
-            VariableValueProvider variableValueProvider = (VariableValueProvider) pageNode;
+        if (pageNode instanceof VariableValueProvider variableValueProvider) {
             Map<String, String> result = new HashMap<String, String>();
             for (Entry<String, String> e : original.entrySet()) {
                 String k = getKey(e.getValue());

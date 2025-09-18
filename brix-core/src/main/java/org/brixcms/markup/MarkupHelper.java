@@ -61,8 +61,7 @@ public class MarkupHelper implements Serializable {
             @Override
             void postprocessTagAttributes(Tag tag, Map<String, String> attributes) {
                 // if during rendering we have a ComponentTag
-                if (tag instanceof ComponentTag && tag.getType() != Tag.Type.CLOSE) {
-                    ComponentTag componentTag = (ComponentTag) tag;
+                if (tag instanceof ComponentTag componentTag && tag.getType() != Tag.Type.CLOSE) {
                     String id = getComponentID(componentTag);
 
                     // check if the component already is in hierarchy

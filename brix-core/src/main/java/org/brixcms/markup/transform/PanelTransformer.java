@@ -67,8 +67,7 @@ public class PanelTransformer extends HeadTransformer {
         List<Item> result = new ArrayList<Item>();
 
         for (Item i : items) {
-            if (i instanceof Tag) {
-                Tag tag = (Tag) i;
+            if (i instanceof Tag tag) {
                 if (shouldFilter(tag.getName())) {
                     continue;
                 }

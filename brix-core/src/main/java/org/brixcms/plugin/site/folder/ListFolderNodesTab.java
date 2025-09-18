@@ -147,8 +147,8 @@ public class ListFolderNodesTab extends BrixGenericPanel<BrixNode> {
             return new IRenderable() {
                 public void render(IModel rowModel, Response response) {
                     BrixNode node = (BrixNode) rowModel.getObject();
-                    if (node instanceof BrixFileNode) {
-                        String mime = ((BrixFileNode) node).getMimeType();
+                    if (node instanceof BrixFileNode fileNode) {
+                        String mime = fileNode.getMimeType();
                         if (mime != null) {
                             response.write(Strings.escapeMarkup(mime));
                         }
@@ -168,8 +168,8 @@ public class ListFolderNodesTab extends BrixGenericPanel<BrixNode> {
             return new IRenderable() {
                 public void render(IModel rowModel, Response response) {
                     BrixNode node = (BrixNode) rowModel.getObject();
-                    if (node instanceof BrixFileNode) {
-                        Long size = ((BrixFileNode) node).getContentLength();
+                    if (node instanceof BrixFileNode fileNode) {
+                        Long size = fileNode.getContentLength();
 
                         response.write(size.toString());
                         response.write(" bytes");

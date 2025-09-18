@@ -15,8 +15,8 @@
 package org.brixcms.plugin.site.resource;
 
 import org.apache.wicket.util.lang.Bytes;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;

@@ -32,6 +32,11 @@
 			<groupId>org.wicketstuff</groupId>
 			<artifactId>wicketstuff-inmethod-grid</artifactId>
 		</dependency>
+        <dependency>
+            <groupId>org.wicketstuff</groupId>
+            <artifactId>wicketstuff-modalwindow9</artifactId>
+            <version>10.6.0-SNAPSHOT</version>
+        </dependency>
 		<dependency>
 			<groupId>com.thoughtworks.xstream</groupId>
 			<artifactId>xstream</artifactId>
@@ -67,8 +72,9 @@
 			<artifactId>wicket-extensions</artifactId>
 		</dependency>
 		<dependency>
-		    <groupId>javax.servlet</groupId>
-		    <artifactId>javax.servlet-api</artifactId>
+		    <groupId>jakarta.servlet</groupId>
+		    <artifactId>jakarta.servlet-api</artifactId>
+			<version>5.0.0</version>
 		</dependency>
 		<!-- LOGGING DEPENDENCIES - LOG4J -->
 		<dependency>
@@ -76,11 +82,11 @@
 			<artifactId>slf4j-api</artifactId>
 		</dependency>
 		<!-- JETTY DEPENDENCIES FOR TESTING -->
-		<dependency>
-			<groupId>org.eclipse.jetty.aggregate</groupId>
-			<artifactId>jetty-all</artifactId>
-			<classifier>uber</classifier>
-		</dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-webapp</artifactId>
+            <version>${jetty.version}</version>
+        </dependency>
 		<!-- TESTING DEPENDENCIES -->
 		<dependency>
 			<groupId>junit</groupId>

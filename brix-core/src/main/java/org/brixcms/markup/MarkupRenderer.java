@@ -58,12 +58,12 @@ public abstract class MarkupRenderer {
     }
 
     private void render(Item item, StringBuilder builder) {
-        if (item instanceof Tag) {
-            render((Tag) item, builder);
-        } else if (item instanceof Text) {
-            render((Text) item, builder);
-        } else if (item instanceof Comment) {
-            render((Comment) item, builder);
+        if (item instanceof Tag tag) {
+            render(tag, builder);
+        } else if (item instanceof Text text) {
+            render(text, builder);
+        } else if (item instanceof Comment comment) {
+            render(comment, builder);
         } else {
             throw new IllegalStateException("Unknown item type '" + item.getClass().getName() + "'");
         }

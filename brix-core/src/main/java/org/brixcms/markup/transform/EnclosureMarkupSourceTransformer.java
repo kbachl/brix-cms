@@ -63,8 +63,7 @@ public class EnclosureMarkupSourceTransformer extends MarkupSourceTransformer {
         List<String> children = null;
         List<Tag> enclosureChildTags = null;
         for (Item i : items) {
-            if (i instanceof Tag) {
-                Tag tag = (Tag) i;
+            if (i instanceof Tag tag) {
                 if (isEnclosure(tag)) {
                     if (tag.getType() == Tag.Type.OPEN) {
                         // found opening enclosure
@@ -158,8 +157,8 @@ public class EnclosureMarkupSourceTransformer extends MarkupSourceTransformer {
      * @return
      */
     private String getGeneratedTagId(Tag tag) {
-        if (tag instanceof ComponentTag) {
-            return MarkupHelper.getComponentID((ComponentTag) tag);
+        if (tag instanceof ComponentTag componentTag) {
+            return MarkupHelper.getComponentID(componentTag);
         }
         return null;
     }

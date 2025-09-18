@@ -56,8 +56,7 @@ public class HeadTransformer extends MarkupSourceTransformer {
         int headDepth = 0;
 
         for (Item i : items) {
-            if (i instanceof Tag) {
-                Tag tag = (Tag) i;
+            if (i instanceof Tag tag) {
                 if (isHead(tag)) {
                     if (tag.getType() == Tag.Type.OPEN) {
                         ++headDepth;
@@ -100,8 +99,7 @@ public class HeadTransformer extends MarkupSourceTransformer {
         int bodyDepth = 0;
 
         for (Item i : originalItems) {
-            if (i instanceof Tag) {
-                Tag tag = (Tag) i;
+            if (i instanceof Tag tag) {
 
                 if (wasHead == false && (isHead(tag) || "body".equals(tag.getName()))) {
                     Map<String, String> emptyMap = Collections.emptyMap();

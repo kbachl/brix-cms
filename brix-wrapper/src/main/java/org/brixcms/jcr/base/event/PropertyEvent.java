@@ -53,8 +53,7 @@ abstract class PropertyEvent extends NodeEvent {
 
     @Override
     Event onNewEvent(Event event, QueueCallback callback) throws RepositoryException {
-        if (event instanceof PropertyEvent) {
-            PropertyEvent e = (PropertyEvent) event;
+        if (event instanceof PropertyEvent e) {
             if (e.getNode().getPath().equals(getNode().getPath()) && e.getPropertyName().equals(getPropertyName())) {
                 return null;
             }

@@ -124,12 +124,12 @@ abstract class FolderDataSource implements IDataSource<BrixNode> {
         } else if (PROPERTY_LAST_MODIFIED_BY.equals(n2.getLastModifiedBy())) {
             return compare(n1.getLastModifiedBy(), n2.getLastModifiedBy());
         } else if (PROPERTY_MIME_TYPE.equals(property)) {
-            String mime1 = (n1 instanceof BrixFileNode) ? ((BrixFileNode) n1).getMimeType(true) : null;
-            String mime2 = (n2 instanceof BrixFileNode) ? ((BrixFileNode) n2).getMimeType(true) : null;
+            String mime1 = (n1 instanceof BrixFileNode bfn) ? bfn.getMimeType(true) : null;
+            String mime2 = (n2 instanceof BrixFileNode bfn) ? bfn.getMimeType(true) : null;
             return compare(mime1, mime2);
         } else if (PROPERTY_SIZE.equals(property)) {
-            Long size1 = (n1 instanceof BrixFileNode) ? ((BrixFileNode) n1).getContentLength() : null;
-            Long size2 = (n2 instanceof BrixFileNode) ? ((BrixFileNode) n2).getContentLength() : null;
+            Long size1 = (n1 instanceof BrixFileNode bfn) ? bfn.getContentLength() : null;
+            Long size2 = (n2 instanceof BrixFileNode bfn) ? bfn.getContentLength() : null;
             return compare(size1, size2);
         }
         return 0;
@@ -139,8 +139,8 @@ abstract class FolderDataSource implements IDataSource<BrixNode> {
         if (c1 == null || c2 == null) {
             return 0;
         } else {
-            if (c1 instanceof String) {
-                return ((String) c1).compareToIgnoreCase((String) c2);
+            if (c1 instanceof String string) {
+                return string.compareToIgnoreCase((String) c2);
             } else {
                 return c1.compareTo(c2);
             }

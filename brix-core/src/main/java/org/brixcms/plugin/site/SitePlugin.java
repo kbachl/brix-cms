@@ -615,8 +615,8 @@ public class SitePlugin implements SessionAwarePlugin {
     }
 
     private NodeTreeContainer findContainer(Component component) {
-        if (component instanceof NodeTreeContainer) {
-            return (NodeTreeContainer) component;
+        if (component instanceof NodeTreeContainer container) {
+            return container;
         } else {
             return component.findParent(NodeTreeContainer.class);
         }
@@ -738,8 +738,7 @@ public class SitePlugin implements SessionAwarePlugin {
         public void handleEventsBeforeSave(Session session, Item item, List<Event> events)
                 throws RepositoryException {
             for (Event e : events) {
-                if (e instanceof AddNodeEvent) {
-                    AddNodeEvent event = (AddNodeEvent) e;
+                if (e instanceof AddNodeEvent event) {
 
                     BrixNode node = wrapNode(event.getNewNode());
                     if (node instanceof ResourceNode) {

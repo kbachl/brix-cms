@@ -16,13 +16,13 @@ package org.brixcms.web.picker.node;
 
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.core.request.handler.IPartialPageRequestHandler;
-import org.apache.wicket.extensions.ajax.markup.html.modal.ModalWindow;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.ResourceModel;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.web.generic.IGenericComponent;
 import org.brixcms.web.tree.JcrTreeNode;
 import org.brixcms.web.tree.NodeFilter;
+import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class NodePickerModalWindow extends ModalWindow implements IGenericComponent<BrixNode> {
     private final JcrTreeNode rootNode;

@@ -16,12 +16,15 @@ package org.brixcms.workspace;
 
 import javax.jcr.RepositoryException;
 
+import java.io.Serial;
+
 /**
  * Generic unchecked jcr-related exception
  *
  * @author ivaynberg
  */
 public class JcrException extends RuntimeException {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public JcrException(RepositoryException cause) {

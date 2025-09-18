@@ -20,12 +20,15 @@ import org.apache.wicket.request.resource.SharedResourceReference;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.page.PageNode;
 
+import java.io.Serial;
+
 /**
  * Renderer for page nodes
  *
  * @author Jeremy Thomerson
  */
 public class PageNodeTreeRenderer extends AbstractNodeTreeRenderer {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private static final ResourceReference RESOURCE = new SharedResourceReference(

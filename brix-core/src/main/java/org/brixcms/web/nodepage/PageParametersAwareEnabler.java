@@ -21,8 +21,7 @@ public class PageParametersAwareEnabler implements IComponentOnConfigureListener
 
     @Override
     public void onConfigure(Component component) {
-        if (component instanceof PageParametersAware) {
-            PageParametersAware aware = (PageParametersAware) component;
+        if (component instanceof PageParametersAware aware) {
             aware.initializeFromPageParameters(BrixPageParameters.getCurrent());
         }
     }

@@ -180,10 +180,10 @@ public abstract class Brix {
     public static BrixNodeWebPage getCurrentPage() {
         IRequestHandler target = RequestCycle.get().getActiveRequestHandler();
         BrixNodeWebPage page = null;
-        if (target != null && target instanceof IPageRequestHandler) {
-            IRequestablePage p = ((IPageRequestHandler) target).getPage();
-            if (p instanceof BrixNodeWebPage) {
-                page = (BrixNodeWebPage) p;
+        if (target != null && target instanceof IPageRequestHandler handler) {
+            IRequestablePage p = handler.getPage();
+            if (p instanceof BrixNodeWebPage webPage) {
+                page = webPage;
             }
         }
         if (page == null) {

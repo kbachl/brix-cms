@@ -142,8 +142,8 @@ public class PageMarkupSource implements MarkupSource {
                     items.add(new SimpleComment(cursor.getText()));
                 } else if (cursor instanceof Text) {
                     items.add(new SimpleText(cursor.toHtml()));
-                } else if (cursor instanceof org.htmlparser.Tag) {
-                    processTag(nodes, current, items, (org.htmlparser.Tag) cursor);
+                } else if (cursor instanceof org.htmlparser.Tag tag) {
+                    processTag(nodes, current, items, tag);
                 } else {
                     throw new BrixException("Unknown node type " + cursor.getClass().getName());
                 }

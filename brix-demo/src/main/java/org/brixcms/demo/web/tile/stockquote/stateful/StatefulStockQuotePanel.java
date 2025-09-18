@@ -21,6 +21,8 @@ import org.apache.wicket.markup.html.panel.Panel;
 import org.apache.wicket.model.PropertyModel;
 import org.brixcms.demo.web.tile.stockquote.StockQuoteRequest;
 
+import java.io.Serial;
+
 /**
  * {@link StatefulStockQuoteTile} panel.
  *
@@ -28,6 +30,7 @@ import org.brixcms.demo.web.tile.stockquote.StockQuoteRequest;
  * @see StatefulStockQuoteTile
  */
 public class StatefulStockQuotePanel extends Panel {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**
@@ -52,7 +55,7 @@ public class StatefulStockQuotePanel extends Panel {
         add(new Label("value", new PropertyModel<String>(this, "value")));
 
         Form<Void> form = new Form<Void>("form") {
-            private static final long serialVersionUID = 1L;
+            @Serial private static final long serialVersionUID = 1L;
 
             @Override
             protected void onSubmit() {

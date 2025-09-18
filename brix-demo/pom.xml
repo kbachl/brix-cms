@@ -53,14 +53,7 @@
 			<plugin>
 				<groupId>org.eclipse.jetty</groupId>
     			<artifactId>jetty-maven-plugin</artifactId>
-				<version>9.4.53.v20231009</version>
-				<dependencies>
-					<dependency>
-						<groupId>javax.servlet</groupId>
-						<artifactId>javax.servlet-api</artifactId>
-						<version>3.1.0</version>
-					</dependency>
-				</dependencies>
+				<version>${jetty.version}</version>
 				<configuration>
 					<contextPath>/brixdemo</contextPath>
 					<connectors>
@@ -88,6 +81,12 @@
 	</build>
 
 	<dependencies>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>5.0.0</version>
+            <scope>provided</scope>
+        </dependency>
 		<dependency>
 			<groupId>org.brixcms</groupId>
 			<artifactId>brix-core</artifactId>
@@ -140,11 +139,11 @@
 			<artifactId>junit</artifactId>
 			<scope>test</scope>
 		</dependency>
-		<dependency>
-			<groupId>org.eclipse.jetty.aggregate</groupId>
-			<artifactId>jetty-all</artifactId>
-			<classifier>uber</classifier>
-		</dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.eclipse.jetty</groupId>-->
+<!--            <artifactId>jetty-webapp</artifactId>-->
+<!--            <version>${jetty.version}</version>-->
+<!--        </dependency>-->
 		<!--+ | LOGGING + -->
 		<dependency>
 			<groupId>org.slf4j</groupId>

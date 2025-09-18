@@ -72,8 +72,7 @@ public abstract class AbstractSitePagePlugin implements SiteNodePlugin {
     public abstract Panel newCreateNodePanel(String id, IModel<BrixNode> parentNode, SimpleCallback goBack);
 
     public NodeConverter getConverterForNode(BrixNode node) {
-        if (node instanceof BrixFileNode) {
-            BrixFileNode fileNode = (BrixFileNode) node;
+        if (node instanceof BrixFileNode fileNode) {
             if (ResourceNodePlugin.TYPE.equals(fileNode.getNodeType())) {
                 String mimeType = fileNode.getMimeType();
                 if (mimeType != null && (mimeType.startsWith("text/") || mimeType.equals("application/xml"))) {

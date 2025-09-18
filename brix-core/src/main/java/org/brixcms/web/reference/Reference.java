@@ -14,6 +14,7 @@
 
 package org.brixcms.web.reference;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.List;
 
@@ -31,6 +32,7 @@ import org.brixcms.web.nodepage.BrixNodeRequestHandler;
 import org.brixcms.web.nodepage.BrixPageParameters;
 
 public class Reference implements Serializable, IDetachable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     private IModel<BrixNode> nodeModel;

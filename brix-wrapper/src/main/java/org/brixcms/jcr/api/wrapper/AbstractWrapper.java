@@ -80,8 +80,8 @@ abstract class AbstractWrapper {
         if (behavior != null) {
             behavior.handleException(e);
         } else {
-            if (e instanceof RepositoryException) {
-                throw new JcrException((RepositoryException) e);
+            if (e instanceof RepositoryException exception) {
+                throw new JcrException(exception);
             } else {
                 throw new RuntimeException(e);
             }

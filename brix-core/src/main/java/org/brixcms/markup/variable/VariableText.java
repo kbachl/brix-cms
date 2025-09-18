@@ -34,8 +34,8 @@ public class VariableText implements Text, VariableKeyProvider {
 
     public String getText() {
         BrixNode node = new BrixNodeModel(pageNodeModel).getObject();
-        if (node instanceof VariableValueProvider) {
-            String value = ((VariableValueProvider) node).getVariableValue(key);
+        if (node instanceof VariableValueProvider provider) {
+            String value = provider.getVariableValue(key);
             return value != null ? value : "[" + key + "]";
         } else {
             return "Couldn't resolve variable '" + key + "'";

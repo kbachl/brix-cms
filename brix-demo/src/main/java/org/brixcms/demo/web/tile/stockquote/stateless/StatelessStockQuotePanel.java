@@ -24,6 +24,8 @@ import org.brixcms.web.nodepage.BrixPageParameters;
 import org.brixcms.web.nodepage.PageParametersAware;
 import org.brixcms.web.nodepage.PageParametersForm;
 
+import java.io.Serial;
+
 /**
  * {@link StatelessStockQuoteTile} panel. This panel demonstrates Brix's stateless tile functionality.
  * <p/>
@@ -37,6 +39,7 @@ import org.brixcms.web.nodepage.PageParametersForm;
  * @author igor.vaynberg
  */
 public class StatelessStockQuotePanel extends Panel implements PageParametersAware {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**

@@ -14,6 +14,7 @@
 
 package org.brixcms.plugin.site.admin.nodetree;
 
+import java.io.Serial;
 import java.io.Serializable;
 
 import org.apache.wicket.AttributeModifier;
@@ -35,6 +36,7 @@ import org.brixcms.web.util.AbstractModel;
  * @author Jeremy Thomerson
  */
 public abstract class AbstractNodeTreeRenderer implements NodeTreeRenderer, Serializable {
+    @Serial
     private static final long serialVersionUID = 1L;
 
 
@@ -70,6 +72,7 @@ public abstract class AbstractNodeTreeRenderer implements NodeTreeRenderer, Seri
     protected abstract Class<? extends BrixNode> getNodeClass();
 
     private class NodeTreeRenderingComponent extends LinkIconPanel {
+        @Serial
         private static final long serialVersionUID = 1L;
 
         public NodeTreeRenderingComponent(String id, IModel<Object> model, BaseTree tree) {
@@ -86,7 +89,7 @@ public abstract class AbstractNodeTreeRenderer implements NodeTreeRenderer, Seri
         @Override
         protected Component newContentComponent(String componentId, BaseTree tree, final IModel<?> model) {
             return new Label(componentId, new AbstractModel<String>() {
-                private static final long serialVersionUID = 1L;
+                @Serial private static final long serialVersionUID = 1L;
 
                 @Override
                 public String getObject() {

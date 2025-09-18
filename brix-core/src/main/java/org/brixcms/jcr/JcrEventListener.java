@@ -33,8 +33,8 @@ public class JcrEventListener implements SaveEventListener {
     }
 
     private void handleEvent(Event event) {
-        if (event instanceof SaveEvent) {
-            handleSaveEvent((SaveEvent) event);
+        if (event instanceof SaveEvent saveEvent) {
+            handleSaveEvent(saveEvent);
         }
     }
 

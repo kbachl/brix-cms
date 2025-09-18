@@ -39,8 +39,8 @@ public class SessionBehavior implements Behavior {
 
 
     public JcrNode wrap(Node node, JcrSession session) {
-        if (node instanceof JcrNode) {
-            return (JcrNode) node;
+        if (node instanceof JcrNode jcrNode) {
+            return jcrNode;
         }
 
         JcrNode n = new NodeWrapper(node, session);
@@ -66,8 +66,8 @@ public class SessionBehavior implements Behavior {
     }
 
     public void handleException(Exception e) {
-        if (e instanceof RepositoryException) {
-            throw new JcrException((RepositoryException) e);
+        if (e instanceof RepositoryException exception) {
+            throw new JcrException(exception);
         } else {
             throw new BrixException(e);
         }

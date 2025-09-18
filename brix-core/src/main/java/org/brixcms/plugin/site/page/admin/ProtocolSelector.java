@@ -13,6 +13,7 @@
  */
 package org.brixcms.plugin.site.page.admin;
 
+import java.io.Serial;
 import java.util.Arrays;
 
 import org.apache.wicket.markup.html.form.ChoiceRenderer;
@@ -25,10 +26,10 @@ public class ProtocolSelector extends DropDownChoice<Boolean> {
 
         setModel(model);
 
-        setChoices(Arrays.asList(new Boolean[] { new Boolean(true), new Boolean(false) }));
+        setChoices(Arrays.asList(new Boolean[] { Boolean.valueOf(true), Boolean.valueOf(false) }));
 
         setChoiceRenderer(new ChoiceRenderer<Boolean>() {
-            private static final long serialVersionUID = 1L;
+            @Serial private static final long serialVersionUID = 1L;
 
             @Override
             public Object getDisplayValue(Boolean object) {

@@ -20,6 +20,7 @@ import org.apache.wicket.model.IModel;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.wrapper.BrixNode;
 
+import java.io.Serial;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.time.Duration;
@@ -31,6 +32,7 @@ import java.util.Date;
  * @author igor.vaynberg
  */
 public class TimeLabel extends Label {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     /**
@@ -52,6 +54,7 @@ public class TimeLabel extends Label {
      * @author igor.vaynberg
      */
     private static class TimeStringModel implements IModel<String> {
+        @Serial
         private static final long serialVersionUID = 1L;
 
         /**

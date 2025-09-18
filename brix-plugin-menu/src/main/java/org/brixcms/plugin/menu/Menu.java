@@ -110,8 +110,7 @@ public class Menu implements IDetachable {
     }
 
     private void saveEntry(BrixNode node, Entry entry) {
-        if (entry instanceof ChildEntry) {
-            ChildEntry childEntry = (ChildEntry) entry;
+        if (entry instanceof ChildEntry childEntry) {
             node.setProperty("title", childEntry.getTitle());
             node.setProperty("cssClass", childEntry.getCssClass());
             node.setProperty("menuType", childEntry.getMenuType().toString());

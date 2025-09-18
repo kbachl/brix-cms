@@ -65,8 +65,8 @@ public class ModelBuffer implements IModel<Object> {
 
 
     public void detach() {
-        if (target != null && target instanceof IModel) {
-            ((IModel<?>) target).detach();
+        if (target != null && target instanceof IModel<?> model) {
+            model.detach();
         }
     }
 
@@ -176,8 +176,8 @@ public class ModelBuffer implements IModel<Object> {
 
         public void detach() {
             delegate.detach();
-            if (value instanceof IDetachable) {
-                ((IDetachable) value).detach();
+            if (value instanceof IDetachable detachable) {
+                detachable.detach();
             }
         }
 
@@ -204,8 +204,8 @@ public class ModelBuffer implements IModel<Object> {
         @Override
         public Object getObject() {
             Object value = super.getObject();
-            if (value instanceof IModel) {
-                return ((IModel) value).getObject();
+            if (value instanceof IModel model) {
+                return model.getObject();
             } else {
                 return value;
             }
@@ -213,8 +213,8 @@ public class ModelBuffer implements IModel<Object> {
 
         @Override
         public void setObject(Object object) {
-            if (object instanceof BrixNode) {
-                super.setObject(new BrixNodeModel((BrixNode) object));
+            if (object instanceof BrixNode node) {
+                super.setObject(new BrixNodeModel(node));
             } else {
                 super.setObject(object);
             }
@@ -222,8 +222,8 @@ public class ModelBuffer implements IModel<Object> {
 
         @Override
         protected void apply(IModel delegate, Object value) {
-            if (value instanceof IModel) {
-                value = ((IModel) value).getObject();
+            if (value instanceof IModel model) {
+                value = model.getObject();
             }
             super.apply(delegate, value);
         }

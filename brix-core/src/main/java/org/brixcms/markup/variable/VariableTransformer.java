@@ -42,8 +42,8 @@ public class VariableTransformer extends MarkupSourceTransformer {
     protected List<Item> transform(List<Item> originalItems) {
         List<Item> result = new ArrayList<Item>(originalItems.size());
         for (Item i : originalItems) {
-            if (i instanceof Tag) {
-                Item item = processTag((Tag) i);
+            if (i instanceof Tag tag) {
+                Item item = processTag(tag);
                 if (item != null) {
                     result.add(item);
                 }
@@ -75,8 +75,8 @@ public class VariableTransformer extends MarkupSourceTransformer {
             // simple tag is guaranteed to be "static" so we will only wrap it
             // if really needed
             return processSimpleTag(tag);
-        } else if (tag instanceof ComponentTag) {
-            return new VariableComponentTag(pageNode, (ComponentTag) tag);
+        } else if (tag instanceof ComponentTag componentTag) {
+            return new VariableComponentTag(pageNode, componentTag);
         } else {
             return new VariableTag(pageNode, tag);
         }

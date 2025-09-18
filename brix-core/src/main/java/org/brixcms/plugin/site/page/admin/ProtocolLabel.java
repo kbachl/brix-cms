@@ -16,7 +16,10 @@ package org.brixcms.plugin.site.page.admin;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.model.IModel;
 
+import java.io.Serial;
+
 public class ProtocolLabel extends Label {
+    @Serial
     private static final long serialVersionUID = 1L;
 
     public ProtocolLabel(String id, final IModel<Boolean> protocolModel) {

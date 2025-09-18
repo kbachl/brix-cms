@@ -34,8 +34,7 @@ public class ChangeNodeMixinsEvent extends NodeEvent {
 
     @Override
     Event onNewEvent(Event event, QueueCallback callback) throws RepositoryException {
-        if (event instanceof ChangeNodeMixinsEvent) {
-            ChangeNodeMixinsEvent e = (ChangeNodeMixinsEvent) event;
+        if (event instanceof ChangeNodeMixinsEvent e) {
             if (e.getNode().getPath().equals(getNode().getPath())) {
                 // remove current event, will get replaced by the new one
                 return null;

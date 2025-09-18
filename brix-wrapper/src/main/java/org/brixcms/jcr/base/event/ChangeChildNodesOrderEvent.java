@@ -34,8 +34,7 @@ public class ChangeChildNodesOrderEvent extends NodeEvent {
 
     @Override
     Event onNewEvent(Event event, QueueCallback callback) throws RepositoryException {
-        if (event instanceof ChangeChildNodesOrderEvent) {
-            ChangeChildNodesOrderEvent e = (ChangeChildNodesOrderEvent) event;
+        if (event instanceof ChangeChildNodesOrderEvent e) {
             if (e.getNode().getPath().equals(getNode().getPath())) {
                 // remove current event, will get replaced by the new one
                 return null;

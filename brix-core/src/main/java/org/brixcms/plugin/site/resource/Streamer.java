@@ -61,7 +61,7 @@ class Streamer {
 
         if (first != null && last != null) {
             response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
-            response.addHeader("Content-Range", "bytes " + first + "-" + last + "/" + length);
+            response.setHeader("Content-Range", "bytes " + first + "-" + last + "/" + length);
 
             contentLength = last - first + 1;
         } else {
@@ -70,24 +70,32 @@ class Streamer {
             last = length - 1;
         }
 
-        response.addHeader("Content-Length", "" + contentLength);
+        //let container do it via setContentLengthLong
+        //response.setHeader("Content-Length", "" + contentLength);
+
+        response.setContentLengthLong(contentLength);
+
 
         if (!attachment) {
-            response.addHeader("Content-Disposition", "inline; filename=\"" + fileName + "\";");
+            response.setHeader("Content-Disposition", "inline; filename=\"" + fileName + "\";");
         } else {
-            response.addHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\";");
+            response.setHeader("Content-Disposition", "attachment; filename=\"" + fileName + "\";");
         }
-        response.addHeader("Accept-Range", "bytes");
+        response.setHeader("Accept-Ranges", "bytes");
+
 
         /**
-         * should request be kept alive?
+         * we ignore this part now and let the container decide!
          */
-        String keepAlive = request.getHeader("Connection");
-        if(keepAlive != null && keepAlive.equalsIgnoreCase("keep-alive")) {
-            response.addHeader("Connection", "keep-alive");
-        } else {
-            response.addHeader("Connection", "close");
-        }
+//        /**
+//         * should request be kept alive?
+//         */
+//        String keepAlive = request.getHeader("Connection");
+//        if(keepAlive != null && keepAlive.equalsIgnoreCase("keep-alive")) {
+//            response.setHeader("Connection", "keep-alive");
+//        } else {
+//            response.setHeader("Connection", "close");
+//        }
 
         InputStream s = null;
 

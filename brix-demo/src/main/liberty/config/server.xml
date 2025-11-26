@@ -1,0 +1,30 @@
+<server description="Dev Server mit DB und Mail">
+
+    <applicationMonitor updateTrigger="mbean" pollingRate="1h" dropinsEnabled="false"/>
+
+    <featureManager>
+        <feature>jakartaee-10.0</feature>
+        <feature>adminCenter-1.0</feature>
+    </featureManager>
+
+    <httpEndpoint id="defaultHttpEndpoint" host="*" httpPort="9080" httpsPort="9443">
+        <!--        <httpOptions responseBufferSize="65536"/>-->
+        <httpOptions responseBufferSize="65536" maxKeepAliveRequests="-1" persistConnection="true"/>
+    </httpEndpoint>
+    <executor name="default" virtualThreads="true"/>
+    <webApplication location="brixdemo.war" contextRoot="/" startAfterResources="true"/>
+
+
+    <quickStartSecurity userName="brix" userPassword="1234"/>
+
+    <keyStore id="defaultKeyStore" password="keystorePassword"/>
+
+    <!--   [WARNUNG ] SRVE0190E: Datei nicht gefunden: /sa  -->
+<!--    <logging consoleLogLevel="INFO" hideMessage="FFDC1015I,SRVE0190E,CWWKO0801E,CWPKI0824E"-->
+<!--             isoDateFormat="true"/>-->
+    <!--
+    SRVE8094W,
+    -->
+
+
+</server>

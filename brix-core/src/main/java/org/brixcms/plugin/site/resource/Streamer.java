@@ -14,6 +14,8 @@
 
 package org.brixcms.plugin.site.resource;
 
+import org.apache.wicket.request.cycle.RequestCycle;
+import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.lang.Bytes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -90,6 +92,12 @@ class Streamer {
         InputStream s = null;
 
         try {
+            // Wir prüfen, ob wir in einem Wicket-Request sind
+            if (RequestCycle.get() != null && RequestCycle.get().getResponse() instanceof WebResponse) {
+                // Jetzt zwingen wir Wicket, seine gepufferten Header loszuwerden.
+                // Da der Streamer seine Header (oben) schon gesetzt hat, ist das jetzt sicher.
+                ((WebResponse) RequestCycle.get().getResponse()).flush();
+            }
             // flush headers - this is expected to be required for some versions of Firefox
             response.flushBuffer();
 

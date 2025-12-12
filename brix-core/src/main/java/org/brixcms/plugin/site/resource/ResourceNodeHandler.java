@@ -106,9 +106,37 @@ public class ResourceNodeHandler implements IRequestHandler {
 
 			new Streamer(length, stream, fileName, save, r, httpServletResponse).stream();
 		} catch (Exception e) {
-			log.error("Error writing resource data to content", e);
+			if (isClientAbort(e)) {
+				log.debug("Client aborted while streaming resource (ignored): {}", rootMessage(e));
+			} else {
+				log.error("Error writing resource data to content", e);
+			}
 		}
 	}
+
+	private static boolean isClientAbort(Throwable e) {
+		for (Throwable t = e; t != null; t = t.getCause()) {
+			String m = t.getMessage();
+			if (m == null) continue;
+			m = m.toLowerCase();
+			if (m.contains("broken pipe") ||
+					m.contains("connection reset") ||
+					m.contains("reset by peer") ||
+					m.contains("connection is closed") ||
+					m.contains("stream was already closed") ||
+					m.contains("h2exception")) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static String rootMessage(Throwable t) {
+		Throwable c = t;
+		while (c.getCause() != null) c = c.getCause();
+		return c.getMessage();
+	}
+
 
 	@Override
 	public void detach(IRequestCycle requestCycle) {

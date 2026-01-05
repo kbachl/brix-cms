@@ -87,14 +87,23 @@ public class ResourceNodeHandler implements IRequestHandler {
 			final HttpServletRequest r = (HttpServletRequest) requestCycle.getRequest().getContainerRequest();
 			String since = r.getHeader("If-Modified-Since");
 			if (!save && since != null) {
-				Date d = new Date(r.getDateHeader("If-Modified-Since"));
+				try {
+					// Hier try-catch, damit wir bei Fehler weitermachen können
+					long dateHeader = r.getDateHeader("If-Modified-Since");
 
-				// the weird toString comparison is to prevent comparing
-				// milliseconds
-				if (d.after(lastModified) || d.toString().equals(lastModified.toString())) {
-					response.setContentLength(node.getContentLength());
-					response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
-					return;
+					if (dateHeader != -1) {
+						Date d = new Date(dateHeader);
+						// the weird toString comparison is to prevent comparing milliseconds
+						if (d.after(lastModified) || d.toString().equals(lastModified.toString())) {
+							response.setContentLength(node.getContentLength());
+							response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+							return;
+						}
+					}
+				} catch (IllegalArgumentException ignored) {
+					// Header war Schrott (z.B. "+0000"). Wir ignorieren das Caching
+					// und liefern die Datei einfach ganz normal aus.
+					// Optional: log.debug("Invalid If-Modified-Since header received: {}", since);
 				}
 			}
 			String fileName = node.getName();

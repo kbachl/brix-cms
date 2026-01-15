@@ -235,17 +235,13 @@ public class ManageSnapshotsPanel extends BrixGenericPanel<Workspace> {
                             session.getWorkspace().importXML("/", s,
                                     ImportUUIDBehavior.IMPORT_UUID_COLLISION_REMOVE_EXISTING);
 
-
-//                            session.importXML("/", s,
-//                                    ImportUUIDBehavior.IMPORT_UUID_COLLISION_REMOVE_EXISTING);
-//                            session.save();
-                           // session.getWorkspace().getSession().save();
-
+                            session.save();
 
                             brix.initWorkspace(ManageSnapshotsPanel.this.getModelObject(), session);
 
                             getSession().info(ManageSnapshotsPanel.this.getString("restoreSuccessful"));
-                        } catch (IOException e) {
+                        } catch (Exception e) {
+                            e.printStackTrace(System.err);            // <-- erzwingt Sichtbarkeit
                             throw new BrixException(e);
                         }
                     }

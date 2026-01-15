@@ -48,13 +48,13 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
         }
     }
 
-    public BrixNodeModel(BrixNodeModel<T> other) {
+    public BrixNodeModel(BrixNodeModel<?> other) {
         if (other == null) {
             throw new IllegalArgumentException("Argument 'other' may not be null.");
         }
         this.id = other.id;
+        this.node = null;
         this.workspaceName = other.workspaceName;
-        this.node = other.node;
     }
 
     public BrixNodeModel(String id, String workspaceName) {

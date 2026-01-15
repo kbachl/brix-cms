@@ -67,9 +67,7 @@ public class JcrUtils {
      * @throws RuntimeException if repository could not be created
      */
     public static Repository createRepository(String url) {
-        if (url.startsWith("rmi://")) {
-            return createRmiRepository(url);
-        } else if (url.startsWith("file://")) {
+        if (url.startsWith("file://")) {
             return createFileRepository(url);
         } else {
             throw new RuntimeException(
@@ -77,22 +75,6 @@ public class JcrUtils {
         }
     }
 
-    /**
-     * Creates a repository at the location specified by the url. Url must start with <code>rmi://</code>.
-     *
-     * @param url repository home url
-     * @return repository instance
-     * @throws RuntimeException if repository could not be created
-     */
-    public static Repository createRmiRepository(String url) {
-        try {
-            JcrUtils.class.getClassLoader().loadClass("org.apache.jackrabbit.rmi.client.ClientRepositoryFactory");
-
-            return RmiRepositoryFactory.getRmiRepository(url);
-        } catch (Exception e) {
-            throw new RuntimeException("Could not create rmi repository instance at url: " + url, e);
-        }
-    }
 
     /**
      * Creates a repository at the location specified by the url. Url must start with <code>file://</code>.

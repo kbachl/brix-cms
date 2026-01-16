@@ -38,6 +38,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.ProtocolException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 
@@ -124,7 +125,7 @@ public class StockQuoteRequest {
         String response = "";
 
         try {
-            final URL url = new URL(serviceUrl);
+            final URL url = URI.create(serviceUrl).toURL();
             final String message = createMessage(symbol);
 
             // Create the connection where we're going to send the file.

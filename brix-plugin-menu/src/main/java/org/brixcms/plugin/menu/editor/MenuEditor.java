@@ -39,6 +39,7 @@ import com.inmethod.grid.column.editable.EditablePropertyTreeColumn;
 import com.inmethod.grid.column.editable.SubmitCancelColumn;
 import com.inmethod.grid.treegrid.TreeGrid;
 
+@SuppressWarnings("deprecation")
 public class MenuEditor extends BrixGenericPanel<Menu> {
     private MenuTreeModel treeModel;
     private AbstractTree tree;
@@ -61,14 +62,13 @@ public class MenuEditor extends BrixGenericPanel<Menu> {
         super.onBeforeRender();
     }
 
-    @SuppressWarnings("unchecked")
     private void init() {
         treeModel = new MenuTreeModel(getModelObject().getRoot());
 
-        final TreeGrid tg;
-        add(tg = new TreeGrid("treeGrid", treeModel, newColumns()) {
+        final TreeGrid<MenuTreeModel, MenuTreeNode, String> tg;
+        add(tg = new TreeGrid<MenuTreeModel, MenuTreeNode, String>("treeGrid", treeModel, newColumns()) {
             @Override
-            protected void onItemSelectionChanged(IModel item, boolean newValue) {
+            protected void onItemSelectionChanged(IModel<MenuTreeNode> item, boolean newValue) {
                 super.onItemSelectionChanged(item, newValue);
 
                 // if (newValue == false)
@@ -79,7 +79,7 @@ public class MenuEditor extends BrixGenericPanel<Menu> {
             }
 
             @Override
-            public void setItemEdit(IModel rowModel, boolean edit) {
+            public void setItemEdit(IModel<MenuTreeNode> rowModel, boolean edit) {
                 if (edit == true) {
                     selectItem(rowModel, true);
                 }
@@ -225,27 +225,31 @@ public class MenuEditor extends BrixGenericPanel<Menu> {
         selectionChanged(null);
     }
 
-    private List<IGridColumn> newColumns() {
-        List<IGridColumn> columns = new ArrayList<IGridColumn>();
+    private List<IGridColumn<MenuTreeModel, MenuTreeNode, String>> newColumns() {
+        List<IGridColumn<MenuTreeModel, MenuTreeNode, String>> columns =
+                new ArrayList<IGridColumn<MenuTreeModel, MenuTreeNode, String>>();
 
         final ReferenceEditorConfiguration conf = new ReferenceEditorConfiguration();
         ManageMenuPanel panel = findParent(ManageMenuPanel.class);
         conf.setWorkspaceName(panel.getModelObject().getId());
 
-        columns.add(new SubmitCancelColumn("submitCancel1", new ResourceModel("edit")));
-        columns.add(new EditablePropertyTreeColumn(new ResourceModel("title"), "entry.title") {
+        columns.add(new SubmitCancelColumn<MenuTreeModel, MenuTreeNode, String>("submitCancel1", new ResourceModel("edit")));
+        columns.add(new EditablePropertyTreeColumn<MenuTreeModel, MenuTreeNode, String, String>(
+                new ResourceModel("title"), "entry.title") {
             @Override
             protected boolean isClickToEdit() {
                 return false;
             }
         }.setInitialSize(300));
-        columns.add(new EditablePropertyColumn(new ResourceModel("cssClass"), "entry.cssClass") {
+        columns.add(new EditablePropertyColumn<MenuTreeModel, MenuTreeNode, String, String>(
+                new ResourceModel("cssClass"), "entry.cssClass") {
             @Override
             protected boolean isClickToEdit() {
                 return false;
             }
         }.setInitialSize(200));
-        columns.add(new EditablePropertyColumn(new ResourceModel("additionalTags"), "entry.additionalTags") {
+        columns.add(new EditablePropertyColumn<MenuTreeModel, MenuTreeNode, String, String>(
+                new ResourceModel("additionalTags"), "entry.additionalTags") {
             @Override
             protected boolean isClickToEdit() {
                 return false;
@@ -254,9 +258,10 @@ public class MenuEditor extends BrixGenericPanel<Menu> {
 
 
 
-        columns.add(new SwitcherColumn("referenceEditor", new ResourceModel("referenceLabelCode"), conf).setInitialSize(400));
+        columns.add(new SwitcherColumn("referenceEditor", new ResourceModel("referenceLabelCode"), conf)
+                .setInitialSize(400));
 
-        columns.add(new SubmitCancelColumn("submitCancel2", new ResourceModel("edit")));
+        columns.add(new SubmitCancelColumn<MenuTreeModel, MenuTreeNode, String>("submitCancel2", new ResourceModel("edit")));
 
         return columns;
     }

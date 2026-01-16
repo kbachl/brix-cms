@@ -18,6 +18,7 @@ import javax.jcr.ImportUUIDBehavior;
 
 import org.apache.wicket.Page;
 import org.apache.wicket.request.cycle.RequestCycle;
+import org.apache.wicket.settings.DebugSettings.ClassOutputStrategy;
 import org.brixcms.Brix;
 import org.brixcms.Path;
 import org.brixcms.config.BrixConfig;
@@ -71,7 +72,7 @@ public final class WicketApplication extends AbstractWicketApplication {
         final WorkspaceManager wm = getWorkspaceManager();
 
         getCspSettings().blocking().disabled();
-        getDebugSettings().setOutputMarkupContainerClassName(true);
+        getDebugSettings().setOutputMarkupContainerClassNameStrategy(ClassOutputStrategy.HTML_COMMENT);
 
         try {
             // create uri mapper for the cms

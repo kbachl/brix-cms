@@ -31,6 +31,7 @@ import org.apache.wicket.extensions.markup.html.tree.AbstractTree;
  *
  * @author Matej Knopp
  */
+@SuppressWarnings("deprecation")
 public abstract class AbstractTreeModel implements Serializable, TreeModel {
     private List<TreeModelListener> listeners = new ArrayList<TreeModelListener>(0);
 

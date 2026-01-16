@@ -61,7 +61,7 @@ public class StatelessStockQuotePanel extends Panel implements PageParametersAwa
         super(id);
 
         // display value of stock symbol
-        add(new Label("value", new PropertyModel(this, "value")));
+        add(new Label("value", new PropertyModel<String>(this, "value")));
 
         /*
          * notice we use PageParametersForm instead of the regular Form. PageParametersForm is
@@ -74,7 +74,7 @@ public class StatelessStockQuotePanel extends Panel implements PageParametersAwa
         add(form);
 
         // symbol text field
-        form.add(new TextField<String>("symbol", new PropertyModel(this, "symbol")));
+        form.add(new TextField<String>("symbol", new PropertyModel<String>(this, "symbol")));
     }
 
 

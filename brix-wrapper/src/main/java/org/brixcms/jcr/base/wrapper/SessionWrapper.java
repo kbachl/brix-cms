@@ -206,6 +206,7 @@ class SessionWrapper extends BaseWrapper<Session> implements BrixSession {
         return getDelegate().hasPermission(absPath, actions);
     }
 
+    @SuppressWarnings("removal")
     public void checkPermission(String absPath, String actions) throws AccessControlException,
             RepositoryException {
         getDelegate().checkPermission(absPath, actions);

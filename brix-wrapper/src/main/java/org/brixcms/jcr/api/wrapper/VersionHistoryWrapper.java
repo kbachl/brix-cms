@@ -54,7 +54,7 @@ class VersionHistoryWrapper extends NodeWrapper implements JcrVersionHistory {
     public String getVersionableUUID() {
         return executeCallback(new Callback<String>() {
             public String execute() throws Exception {
-                return getDelegate().getVersionableUUID();
+                return getDelegate().getVersionableIdentifier();
             }
         });
     }

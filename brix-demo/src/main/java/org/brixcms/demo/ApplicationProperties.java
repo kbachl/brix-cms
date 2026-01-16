@@ -34,6 +34,7 @@ public class ApplicationProperties {
     /**
      * @deprecated
      */
+    @Deprecated
     public ApplicationProperties() {
         this("brix.demo");
     }

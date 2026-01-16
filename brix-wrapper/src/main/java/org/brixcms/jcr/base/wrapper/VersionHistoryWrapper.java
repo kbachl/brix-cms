@@ -35,6 +35,10 @@ class VersionHistoryWrapper extends NodeWrapper implements VersionHistory {
 
 
 
+    /**
+     * @deprecated use {@link #getVersionableIdentifier()} instead.
+     */
+    @Deprecated
     public String getVersionableUUID() throws RepositoryException {
         return getDelegate().getVersionableIdentifier();
     }

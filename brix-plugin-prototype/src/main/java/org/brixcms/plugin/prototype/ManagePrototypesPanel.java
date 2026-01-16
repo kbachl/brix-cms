@@ -178,9 +178,9 @@ public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
         return Brix.get();
     }
 
-    private class UniquePrototypeNameValidator implements IValidator {
-        public void validate(IValidatable validatable) {
-            String name = (String) validatable.getValue();
+    private class UniquePrototypeNameValidator implements IValidator<String> {
+        public void validate(IValidatable<String> validatable) {
+            String name = validatable.getValue();
             if (PrototypePlugin.get().prototypeExists(name)) {
                 validatable.error(new ValidationError().addKey("UniquePrototypeNameValidator"));
             }

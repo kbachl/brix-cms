@@ -7,7 +7,7 @@ This is a multi-module Maven build. Core code lives in modules like `brix-core`,
 - `src/test/java` and `src/test/resources` for tests and fixtures.
 
 ## Build, Test, and Development Commands
-Java 17 and Maven 3.6.3+ are required (see root `pom.xml`).
+Java 21 and Maven 3.6.3+ are required (see root `pom.xml`).
 - `mvn clean install` builds all modules and runs tests.
 - `mvn -pl brix-core test` runs tests for a single module.
 - `mvn -pl brix-demo -am package` builds the demo WAR plus dependencies.

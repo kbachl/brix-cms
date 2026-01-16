@@ -25,6 +25,7 @@ import javax.jcr.RepositoryException;
  */
 abstract class PropertyEvent extends NodeEvent {
     private final String propertyName;
+    private String propertyPath;
 
     PropertyEvent(Property property) throws RepositoryException {
         super(property.getParent());
@@ -47,8 +48,10 @@ abstract class PropertyEvent extends NodeEvent {
 
     @Override
     boolean isAffected(String path) throws RepositoryException {
-        String currentPath = getNode().getPath() + "/" + getPropertyName();
-        return currentPath.startsWith(path);
+        if (propertyPath == null) {
+            propertyPath = getNodePath() + "/" + getPropertyName();
+        }
+        return propertyPath.startsWith(path);
     }
 
     @Override

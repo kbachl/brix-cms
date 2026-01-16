@@ -243,7 +243,7 @@ class NodeWrapper extends ItemWrapper implements Node {
     }
 
     public NodeIterator getNodes(String[] nameGlobs) throws RepositoryException {
-        return NodeIteratorWrapper.wrap(getDelegate().getNodes(), getSessionWrapper());
+        return NodeIteratorWrapper.wrap(getDelegate().getNodes(nameGlobs), getSessionWrapper());
     }
 
     public Property getProperty(String relPath) throws RepositoryException {

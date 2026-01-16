@@ -25,6 +25,7 @@ import javax.jcr.RepositoryException;
  */
 abstract class NodeEvent extends Event {
     final Node node;
+    private String nodePath;
 
     NodeEvent(Node node) {
         this.node = node;
@@ -34,10 +35,16 @@ abstract class NodeEvent extends Event {
         return node;
     }
 
+    protected String getNodePath() throws RepositoryException {
+        if (nodePath == null) {
+            nodePath = getNode().getPath();
+        }
+        return nodePath;
+    }
+
     @Override
     boolean isAffected(String path) throws RepositoryException {
-        String currentPath = getNode().getPath();
-        return currentPath.startsWith(path);
+        return getNodePath().startsWith(path);
     }
 
     @Override
@@ -45,7 +52,7 @@ abstract class NodeEvent extends Event {
         // if this event's node or some of it's parent is being removed this
         // event should be removed as well
         if (event instanceof BeforeRemoveNodeEvent e) {
-            if (getNode().getPath().startsWith(e.getNode().getPath())) {
+            if (getNodePath().startsWith(e.getNode().getPath())) {
                 return null;
             }
         }

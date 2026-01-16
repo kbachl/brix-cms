@@ -46,13 +46,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.AccessControlException;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
 class SessionWrapper extends BaseWrapper<Session> implements BrixSession {
-    final Set<Node> raisedSaveEvent = new HashSet<Node>();
+    final Set<Node> raisedSaveEvent = Collections.newSetFromMap(new IdentityHashMap<Node, Boolean>());
 
     private final CompoundActionHandler actionHandler = new CompoundActionHandler();
 
@@ -186,12 +187,16 @@ class SessionWrapper extends BaseWrapper<Session> implements BrixSession {
         getActionHandler().beforeSessionSave();
         getDelegate().save();
         getActionHandler().afterSessionSave();
+        raisedSaveEvent.clear();
     }
 
     public void refresh(boolean keepChanges) throws RepositoryException {
         getActionHandler().beforeSessionRefresh(keepChanges);
         getDelegate().refresh(keepChanges);
         getActionHandler().afterSessionRefresh(keepChanges);
+        if (!keepChanges) {
+            raisedSaveEvent.clear();
+        }
     }
 
     public boolean hasPendingChanges() throws RepositoryException {

@@ -19,6 +19,7 @@ import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 
 /**
  * ChangeLog keep tracks of events happening in a single {@link Session}. At certain points (usually when Item#save() or
@@ -47,17 +48,20 @@ public class ChangeLog {
      */
     public void addEvent(Event event) throws RepositoryException {
         final boolean blockAddingEvent[] = {false};
-        for (int i = 0; i < events.size(); ++i) {
-            Event e = events.get(i);
+        for (ListIterator<Event> iterator = events.listIterator(); iterator.hasNext(); ) {
+            Event e = iterator.next();
             Event.QueueCallback callback = new Event.QueueCallback() {
                 public void blockAddingEvent() {
                     blockAddingEvent[0] = true;
                 }
             };
-            events.set(i, e.onNewEvent(event, callback));
+            Event updated = e.onNewEvent(event, callback);
+            if (updated == null) {
+                iterator.remove();
+            } else if (updated != e) {
+                iterator.set(updated);
+            }
         }
-
-        removeNullEvents();
 
         if (blockAddingEvent[0] == false) {
             Event transformed = event.transformBeforeAddingToQueue();
@@ -65,21 +69,6 @@ public class ChangeLog {
                 events.add(transformed);
             }
         }
-    }
-
-    /**
-     * Shrinks the queue removing null events.
-     */
-    private void removeNullEvents() {
-        // remove null events
-        List<Event> newList = new ArrayList<Event>(events.size());
-        for (Event e : events) {
-            if (e != null) {
-                newList.add(e);
-            }
-        }
-
-        events = newList;
     }
 
     /**
@@ -97,14 +86,13 @@ public class ChangeLog {
             events = new ArrayList<Event>();
         } else {
             result = new ArrayList<Event>();
-            for (int i = 0; i < events.size(); ++i) {
-                Event e = events.get(i);
+            for (ListIterator<Event> iterator = events.listIterator(); iterator.hasNext(); ) {
+                Event e = iterator.next();
                 if (e.isAffected(path)) {
                     result.add(e);
-                    events.set(i, null);
+                    iterator.remove();
                 }
             }
-            removeNullEvents();
         }
         return result;
     }

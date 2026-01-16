@@ -24,14 +24,12 @@ import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import javax.jcr.observation.Event;
 import javax.jcr.observation.EventIterator;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class EventUtil {
-    private final static List<SaveEventListener> listeners = Collections
-            .synchronizedList(new ArrayList<SaveEventListener>());
+    private static final List<SaveEventListener> listeners = new CopyOnWriteArrayList<SaveEventListener>();
 
     public static void raiseSaveEvent(Node node) {
         try {
@@ -45,11 +43,8 @@ public class EventUtil {
 
     public static void raiseSaveEvent(JcrNode node) {
         Event event = new EventImpl(node);
-
-        synchronized (listeners) {
-            for (SaveEventListener listener : listeners) {
-                listener.onEvent(new Iterator(event));
-            }
+        for (SaveEventListener listener : listeners) {
+            listener.onEvent(new Iterator(event));
         }
     }
 

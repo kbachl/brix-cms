@@ -35,7 +35,7 @@ import javax.jcr.retention.RetentionManager;
 import javax.jcr.security.AccessControlManager;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -45,7 +45,14 @@ import java.util.Map;
 class SessionWrapper extends AbstractWrapper implements JcrSession {
     private final Behavior behavior;
 
-    private Map<String, JcrNode> uuidMap = new HashMap<String, JcrNode>();
+    private static final int UUID_CACHE_SIZE = 1024;
+    private final Map<String, JcrNode> uuidMap = new LinkedHashMap<String, JcrNode>(
+            UUID_CACHE_SIZE, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, JcrNode> eldest) {
+            return size() > UUID_CACHE_SIZE;
+        }
+    };
 
     public static JcrSession wrap(Session delegate, Behavior behavior) {
         if (delegate == null) {

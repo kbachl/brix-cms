@@ -15,15 +15,20 @@
 package org.brixcms.plugin.site.page.tile;
 
 import org.apache.wicket.Component;
+import org.apache.wicket.MetaDataKey;
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.brixcms.BrixNodeModel;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.markup.tag.ComponentTag;
 import org.brixcms.markup.tag.simple.SimpleTag;
 import org.brixcms.markup.variable.VariableKeyProvider;
 import org.brixcms.plugin.site.page.AbstractContainer;
+import org.brixcms.plugin.site.SitePlugin;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,6 +50,7 @@ public class TileTag extends SimpleTag
     private final String tileName;
 
     private final BrixNodeModel tileContainerNodeModel;
+    private final String tileContainerKey;
 
     private String id;
 
@@ -60,6 +66,7 @@ public class TileTag extends SimpleTag
         super(name, type, attributeMap);
         this.tileName = tileName;
         tileContainerNodeModel = new BrixNodeModel(tileContainerNode);
+        tileContainerKey = buildContainerKey(tileContainerNode);
         tileContainerNodeModel.detach();
     }
 
@@ -79,7 +86,7 @@ public class TileTag extends SimpleTag
         if(container == null) {
             return null;
         }
-        BrixNode tileNode = container.getTileNode(tileName);
+        BrixNode tileNode = getTileNode(container, tileName);
 
         if (tileNode != null) {
             Tile tile = Tile.Helper.getTileOfType(TileContainerFacet.getTileClassName(tileNode),
@@ -105,7 +112,11 @@ public class TileTag extends SimpleTag
      * {@inheritDoc}
      */
     public Collection<String> getVariableKeys() {
-        BrixNode tileNode = getTileContainer().tiles().getTile(tileName);
+        AbstractContainer container = getTileContainer();
+        if (container == null) {
+            return null;
+        }
+        BrixNode tileNode = getTileNode(container, tileName);
         if (tileNode != null) {
             Tile tile = Tile.Helper.getTileOfType(TileContainerFacet.getTileClassName(tileNode),
                     tileNode.getBrix());
@@ -120,8 +131,89 @@ public class TileTag extends SimpleTag
      * @return tile container that contains the tile
      */
     protected AbstractContainer getTileContainer() {
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle != null && tileContainerKey != null) {
+            Map<String, AbstractContainer> cache = cycle.getMetaData(CONTAINER_CACHE_KEY);
+            if (cache == null) {
+                cache = new HashMap<String, AbstractContainer>();
+                cycle.setMetaData(CONTAINER_CACHE_KEY, cache);
+            }
+            AbstractContainer cached = cache.get(tileContainerKey);
+            if (cached != null) {
+                return cached;
+            }
+        }
         AbstractContainer container = (AbstractContainer) tileContainerNodeModel.getObject();
         tileContainerNodeModel.detach();
+        if (cycle != null && tileContainerKey != null) {
+            Map<String, AbstractContainer> cache = cycle.getMetaData(CONTAINER_CACHE_KEY);
+            if (cache != null) {
+                cache.put(tileContainerKey, container);
+            }
+        }
         return container;
     }
+
+    private BrixNode getTileNode(AbstractContainer container, String id) {
+        Map<String, BrixNode> tileMap = getTileMap(container);
+        if (tileMap != null) {
+            return tileMap.get(id);
+        }
+        return container.getTileNode(id);
+    }
+
+    private Map<String, BrixNode> getTileMap(AbstractContainer container) {
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null || tileContainerKey == null) {
+            return null;
+        }
+        Map<String, Map<String, BrixNode>> cache = cycle.getMetaData(TILE_CACHE_KEY);
+        if (cache == null) {
+            cache = new HashMap<String, Map<String, BrixNode>>();
+            cycle.setMetaData(TILE_CACHE_KEY, cache);
+        }
+        Map<String, BrixNode> tileMap = cache.get(tileContainerKey);
+        if (tileMap == null) {
+            tileMap = buildTileMap(container);
+            cache.put(tileContainerKey, tileMap);
+        }
+        return tileMap;
+    }
+
+    private Map<String, BrixNode> buildTileMap(AbstractContainer container) {
+        Map<String, BrixNode> result = new HashMap<String, BrixNode>();
+        AbstractContainer current = container;
+        while (current != null) {
+            addTiles(current, result);
+            current = current.getTemplate();
+        }
+        AbstractContainer global = SitePlugin.get().getGlobalContainer(container.getSession());
+        if (global != null) {
+            addTiles(global, result);
+        }
+        return result;
+    }
+
+    private void addTiles(AbstractContainer container, Map<String, BrixNode> result) {
+        List<BrixNode> tiles = container.tiles().getTileNodes();
+        for (BrixNode node : tiles) {
+            String id = TileContainerFacet.getTileId(node);
+            if (id != null && !result.containsKey(id)) {
+                result.put(id, node);
+            }
+        }
+    }
+
+    private String buildContainerKey(AbstractContainer container) {
+        String workspace = container.getSession().getWorkspace().getName();
+        String nodeId = container.isNodeType("mix:referenceable") ? container.getIdentifier() : container.getPath();
+        return workspace + "-" + nodeId;
+    }
+
+    private static final MetaDataKey<Map<String, AbstractContainer>> CONTAINER_CACHE_KEY =
+            new MetaDataKey<Map<String, AbstractContainer>>() {
+            };
+    private static final MetaDataKey<Map<String, Map<String, BrixNode>>> TILE_CACHE_KEY =
+            new MetaDataKey<Map<String, Map<String, BrixNode>>>() {
+            };
 }

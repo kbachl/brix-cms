@@ -40,6 +40,14 @@ public class WorkspaceUtils {
     };
     private static final Logger log = LoggerFactory.getLogger(WorkspaceUtils.class);
 
+    /**
+     * Returns the workspace ID, which is the same as the workspace name.
+     * @return workspace ID
+     */
+    public static String getWorkspaceId() {
+        return getWorkspace();
+    }
+
     public static String getWorkspace() {
         RequestCycle rc = RequestCycle.get();
         String workspace = rc.getMetaData(WORKSPACE_METADATA);

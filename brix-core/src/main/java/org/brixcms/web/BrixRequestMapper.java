@@ -17,15 +17,21 @@ package org.brixcms.web;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.apache.wicket.Application;
 import org.apache.wicket.Component;
 import org.apache.wicket.DefaultMapperContext;
+import org.apache.wicket.MetaDataKey;
 import org.apache.wicket.core.request.handler.BookmarkableListenerRequestHandler;
 import org.apache.wicket.core.request.handler.IPageProvider;
 import org.apache.wicket.core.request.handler.IPageRequestHandler;
@@ -44,6 +50,7 @@ import org.apache.wicket.request.Request;
 import org.apache.wicket.request.Url;
 import org.apache.wicket.request.Url.QueryParameter;
 import org.apache.wicket.request.component.IRequestablePage;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebRequest;
 import org.apache.wicket.request.http.handler.RedirectRequestHandler;
 import org.apache.wicket.request.mapper.info.ComponentInfo;
@@ -80,6 +87,11 @@ import org.slf4j.LoggerFactory;
 public class BrixRequestMapper extends AbstractComponentMapper {
 
     private static final Logger log = LoggerFactory.getLogger(BrixRequestMapper.class);
+    private static final MetaDataKey<RequestPathCache> REQUEST_PATH_CACHE_KEY = new MetaDataKey<RequestPathCache>() {
+    };
+    private static final String PATH_CACHE_SIZE_PROPERTY = "brix.mapper.pathCacheSize";
+    private static final int SHARED_PATH_CACHE_SIZE = Integer.getInteger(PATH_CACHE_SIZE_PROPERTY, 8192);
+    private static final ConcurrentMap<String, PathNodeCache> SHARED_PATH_CACHES = new ConcurrentHashMap<>();
 
     private final Brix brix;
     private final HttpsConfig config;
@@ -192,12 +204,13 @@ public class BrixRequestMapper extends AbstractComponentMapper {
                 if (componentInfo != null) {
                     renderCount = componentInfo.getRenderCount();
                 }
+                final BrixNode pageNode = getNodeForUriPath(finalPath);
                 PageAndComponentProvider provider = new PageAndComponentProvider(info.getPageInfo().getPageId(), PageRenderingPage.class,
                         new BrixPageParameters(request.getRequestParameters()), renderCount, componentInfo.getComponentPath());
                 provider.setPageSource(new DefaultMapperContext() {
                     @Override
                     public IRequestablePage newPageInstance(Class<? extends IRequestablePage> pageClass, PageParameters pageParameters) {
-                        return new PageRenderingPage(new BrixNodeModel(getNodeForUriPath(finalPath)),
+                        return new PageRenderingPage(new BrixNodeModel(pageNode),
                                 createBrixPageParams(request.getUrl(), finalPath));
                     }
                 });
@@ -474,32 +487,111 @@ public class BrixRequestMapper extends AbstractComponentMapper {
      *         if none
      */
     public BrixNode getNodeForUriPath(final Path uriPath) {
-        BrixNode node = null;
+        final String uriPathKey = uriPath.toString();
+        RequestPathCache requestCache = getRequestPathCache();
+        if (requestCache != null && requestCache.contains(uriPathKey)) {
+            return requestCache.get(uriPathKey);
+        }
 
-        // create desired nodepath
-        final Path nodePath = brix.getConfig().getMapper().getNodePathForUriPath(uriPath.toAbsolute(), brix);
+        final String workspace = WorkspaceUtils.getWorkspace();
+        final JcrSession session = brix.getCurrentSession(workspace);
 
-//        if(nodePath.isRoot() && nodePath != null) {
-//            final BrixNode rootNode = getNodeForUriPath(nodePath);
-//
-//        }
+        PathNodeCache sharedCache = getSharedPathCache(workspace);
+        NodeReference reference = sharedCache != null ? sharedCache.get(uriPathKey) : null;
 
-        if (nodePath != null) {
-            // allow site plugin to translate the node path into an actual jcr
-            // path
-            final String jcrPath = SitePlugin.get().toRealWebNodePath(nodePath.toString());
+        BrixNode node = resolveFromReference(session, reference);
+        String jcrPath = reference != null ? reference.jcrPath : null;
+        String nodeId = reference != null ? reference.nodeId : null;
 
-            // retrieve jcr session
-            final String workspace = WorkspaceUtils.getWorkspace();
-            final JcrSession session = brix.getCurrentSession(workspace);
+        if (node == null) {
+            final Path nodePath = brix.getConfig().getMapper().getNodePathForUriPath(uriPath.toAbsolute(), brix);
+            if (nodePath != null) {
+                jcrPath = SitePlugin.get().toRealWebNodePath(nodePath.toString());
+                if (session.itemExists(jcrPath)) {
+                    node = (BrixNode) session.getItem(jcrPath);
+                    nodeId = getNodeIdentifier(node);
+                }
+            }
 
-            if (session.itemExists(jcrPath)) {
-                // node exists, return it
-                node = (BrixNode) session.getItem(jcrPath);
+            if (node == null && sharedCache != null && reference != null) {
+                sharedCache.remove(uriPathKey);
             }
         }
 
+        if (node != null && sharedCache != null && jcrPath != null) {
+            if (nodeId == null) {
+                nodeId = getNodeIdentifier(node);
+            }
+            sharedCache.put(uriPathKey, new NodeReference(jcrPath, nodeId));
+        }
+
+        if (requestCache != null) {
+            requestCache.put(uriPathKey, node);
+        }
+
         return node;
+    }
+
+    private RequestPathCache getRequestPathCache() {
+        RequestCycle requestCycle = RequestCycle.get();
+        if (requestCycle == null) {
+            return null;
+        }
+        RequestPathCache cache = requestCycle.getMetaData(REQUEST_PATH_CACHE_KEY);
+        if (cache == null) {
+            cache = new RequestPathCache();
+            requestCycle.setMetaData(REQUEST_PATH_CACHE_KEY, cache);
+        }
+        return cache;
+    }
+
+    private PathNodeCache getSharedPathCache(String workspace) {
+        if (SHARED_PATH_CACHE_SIZE < 1) {
+            return null;
+        }
+        String key = workspace != null ? workspace : "";
+        return SHARED_PATH_CACHES.computeIfAbsent(key, ignored -> new PathNodeCache(SHARED_PATH_CACHE_SIZE));
+    }
+
+    private BrixNode resolveFromReference(JcrSession session, NodeReference reference) {
+        if (reference == null) {
+            return null;
+        }
+        BrixNode node = null;
+        if (reference.nodeId != null) {
+            try {
+                node = (BrixNode) session.getNodeByIdentifier(reference.nodeId);
+            } catch (JcrException e) {
+                node = null;
+            }
+            if (node != null && reference.jcrPath != null) {
+                try {
+                    if (!reference.jcrPath.equals(node.getPath())) {
+                        node = null;
+                    }
+                } catch (JcrException e) {
+                    node = null;
+                }
+            }
+        }
+        if (node == null && reference.jcrPath != null && session.itemExists(reference.jcrPath)) {
+            node = (BrixNode) session.getItem(reference.jcrPath);
+        }
+        return node;
+    }
+
+    private String getNodeIdentifier(BrixNode node) {
+        if (node == null) {
+            return null;
+        }
+        try {
+            if (node.isNodeType("mix:referenceable")) {
+                return node.getIdentifier();
+            }
+        } catch (JcrException e) {
+            return null;
+        }
+        return null;
     }
 
     /**
@@ -597,5 +689,56 @@ public class BrixRequestMapper extends AbstractComponentMapper {
     }
 
     public static final class HomePage extends WebPage {
+    }
+
+    private static final class RequestPathCache {
+        private final Map<String, BrixNode> nodes = new HashMap<String, BrixNode>();
+
+        boolean contains(String uriPath) {
+            return nodes.containsKey(uriPath);
+        }
+
+        BrixNode get(String uriPath) {
+            return nodes.get(uriPath);
+        }
+
+        void put(String uriPath, BrixNode node) {
+            nodes.put(uriPath, node);
+        }
+    }
+
+    private static final class NodeReference {
+        private final String jcrPath;
+        private final String nodeId;
+
+        private NodeReference(String jcrPath, String nodeId) {
+            this.jcrPath = jcrPath;
+            this.nodeId = nodeId;
+        }
+    }
+
+    private static final class PathNodeCache {
+        private final LinkedHashMap<String, NodeReference> cache;
+
+        private PathNodeCache(final int maxSize) {
+            cache = new LinkedHashMap<String, NodeReference>(128, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, NodeReference> eldest) {
+                    return size() > maxSize;
+                }
+            };
+        }
+
+        synchronized NodeReference get(String uriPath) {
+            return cache.get(uriPath);
+        }
+
+        synchronized void put(String uriPath, NodeReference reference) {
+            cache.put(uriPath, reference);
+        }
+
+        synchronized void remove(String uriPath) {
+            cache.remove(uriPath);
+        }
     }
 }

@@ -63,6 +63,21 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
         this.workspaceName = workspaceName;
     }
 
+    public String getId() {
+        return id;
+    }
+
+    public String getWorkspaceName() {
+        return workspaceName;
+    }
+
+    public String getCacheKey() {
+        if (id == null || workspaceName == null) {
+            return null;
+        }
+        return workspaceName + "-" + id;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {

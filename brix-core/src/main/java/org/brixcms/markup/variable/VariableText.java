@@ -17,34 +17,32 @@ package org.brixcms.markup.variable;
 import org.brixcms.BrixNodeModel;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.markup.tag.Text;
-import org.apache.wicket.MetaDataKey;
-import org.apache.wicket.request.cycle.RequestCycle;
 
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 
 public class VariableText implements Text, VariableKeyProvider {
-    private final BrixNodeModel pageNodeModel;
+    private final BrixNodeModel<BrixNode> pageNodeModel;
     private final String key;
-    private final String pageNodeKey;
 
     public VariableText(BrixNode pageNode, String key) {
-        this.pageNodeModel = new BrixNodeModel(pageNode);
+        this.pageNodeModel = new BrixNodeModel<>(pageNode);
         this.key = key;
-        this.pageNodeKey = buildNodeKey(pageNode);
         this.pageNodeModel.detach();
     }
 
 
     public String getText() {
-        BrixNode node = getPageNode();
-        if (node instanceof VariableValueProvider provider) {
-            String value = provider.getVariableValue(key);
-            return value != null ? value : "[" + key + "]";
-        } else {
-            return "Couldn't resolve variable '" + key + "'";
+        BrixNode node = pageNodeModel.getObject();
+        try {
+            if (node instanceof VariableValueProvider provider) {
+                String value = provider.getVariableValue(key);
+                return value != null ? value : "[" + key + "]";
+            } else {
+                return "Couldn't resolve variable '" + key + "'";
+            }
+        } finally {
+            pageNodeModel.detach();
         }
     }
 
@@ -52,33 +50,4 @@ public class VariableText implements Text, VariableKeyProvider {
     public Collection<String> getVariableKeys() {
         return Arrays.asList(new String[]{key});
     }
-
-    private BrixNode getPageNode() {
-        RequestCycle cycle = RequestCycle.get();
-        if (cycle != null && pageNodeKey != null) {
-            Map<String, BrixNode> cache = cycle.getMetaData(NODE_CACHE_KEY);
-            if (cache == null) {
-                cache = new HashMap<String, BrixNode>();
-                cycle.setMetaData(NODE_CACHE_KEY, cache);
-            }
-            BrixNode cached = cache.get(pageNodeKey);
-            if (cached != null) {
-                return cached;
-            }
-            BrixNode node = new BrixNodeModel(pageNodeModel).getObject();
-            cache.put(pageNodeKey, node);
-            return node;
-        }
-        return new BrixNodeModel(pageNodeModel).getObject();
-    }
-
-    private String buildNodeKey(BrixNode node) {
-        String workspace = node.getSession().getWorkspace().getName();
-        String nodeId = node.isNodeType("mix:referenceable") ? node.getIdentifier() : node.getPath();
-        return workspace + "-" + nodeId;
-    }
-
-    private static final MetaDataKey<Map<String, BrixNode>> NODE_CACHE_KEY =
-            new MetaDataKey<Map<String, BrixNode>>() {
-            };
 }

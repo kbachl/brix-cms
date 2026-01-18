@@ -46,7 +46,7 @@
 
 	<properties>
 		<!-- brix version is now set here -->
-		<revision>10.10.4</revision>
+		<revision>10.10.5</revision>
 		<changelist>-SNAPSHOT</changelist>
 
 		<maven.compiler.release>21</maven.compiler.release>

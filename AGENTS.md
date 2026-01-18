@@ -13,6 +13,8 @@ Java 21 and Maven 3.6.3+ are required (see root `pom.xml`).
 - `mvn -pl brix-demo -am package` builds the demo WAR plus dependencies.
 - `mvn -pl brix-demo liberty:dev` starts the demo app on Open Liberty for local development.
 
+expected compilation + test time is about 15-30seconds
+
 ## Coding Style & Naming Conventions
 Use the Eclipse formatter in `etc/eclipse-formatter.xml` (4-space indentation, spaces not tabs). Follow Java conventions: packages are lowercase (`org.brixcms.*`), classes in `PascalCase`, methods/fields in `camelCase`. For Wicket components, keep `Component.java`, `Component.html`, and optional `Component.properties` together and name them identically.
 

@@ -50,6 +50,13 @@ abstract class PropertyEvent extends NodeEvent {
     boolean isAffected(String path) throws RepositoryException {
         if (propertyPath == null) {
             propertyPath = getNodePath() + "/" + getPropertyName();
+        } else if (!propertyPath.startsWith(path)) {
+            String currentNodePath = getNodePath();
+            String freshNodePath = getNode().getPath();
+            if (!freshNodePath.equals(currentNodePath)) {
+                setNodePath(freshNodePath);
+                propertyPath = freshNodePath + "/" + getPropertyName();
+            }
         }
         return propertyPath.startsWith(path);
     }

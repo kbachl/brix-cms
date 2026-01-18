@@ -35,6 +35,10 @@ abstract class NodeEvent extends Event {
         return node;
     }
 
+    protected void setNodePath(String nodePath) {
+        this.nodePath = nodePath;
+    }
+
     protected String getNodePath() throws RepositoryException {
         if (nodePath == null) {
             nodePath = getNode().getPath();
@@ -44,7 +48,15 @@ abstract class NodeEvent extends Event {
 
     @Override
     boolean isAffected(String path) throws RepositoryException {
-        return getNodePath().startsWith(path);
+        String currentPath = getNodePath();
+        if (!currentPath.startsWith(path)) {
+            String freshPath = getNode().getPath();
+            if (!freshPath.equals(currentPath)) {
+                setNodePath(freshPath);
+                currentPath = freshPath;
+            }
+        }
+        return currentPath.startsWith(path);
     }
 
     @Override
@@ -52,7 +64,16 @@ abstract class NodeEvent extends Event {
         // if this event's node or some of it's parent is being removed this
         // event should be removed as well
         if (event instanceof BeforeRemoveNodeEvent e) {
-            if (getNodePath().startsWith(e.getNode().getPath())) {
+            String currentPath = getNodePath();
+            String removedPath = e.getNode().getPath();
+            if (!currentPath.startsWith(removedPath)) {
+                String freshPath = getNode().getPath();
+                if (!freshPath.equals(currentPath)) {
+                    setNodePath(freshPath);
+                    currentPath = freshPath;
+                }
+            }
+            if (currentPath.startsWith(removedPath)) {
                 return null;
             }
         }

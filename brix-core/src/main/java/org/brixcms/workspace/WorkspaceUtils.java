@@ -41,14 +41,17 @@ public class WorkspaceUtils {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceUtils.class);
 
     public static String getWorkspace() {
-        String workspace = getWorkspaceFromUrl();
-
+        RequestCycle rc = RequestCycle.get();
+        String workspace = rc.getMetaData(WORKSPACE_METADATA);
         if (workspace != null) {
             return workspace;
         }
 
-        RequestCycle rc = RequestCycle.get();
-        workspace = rc.getMetaData(WORKSPACE_METADATA);
+        workspace = getWorkspaceFromUrl();
+        if (workspace != null) {
+            return workspace;
+        }
+
         if (workspace == null) {
             WebRequest req = (WebRequest) RequestCycle.get().getRequest();
             WebResponse resp = (WebResponse) RequestCycle.get().getResponse();

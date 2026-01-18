@@ -18,6 +18,8 @@ import org.brixcms.Brix;
 import org.brixcms.BrixNodeModel;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.markup.tag.Tag;
+import org.apache.wicket.MetaDataKey;
+import org.apache.wicket.request.cycle.RequestCycle;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -30,6 +32,7 @@ public class VariableTag implements Tag, VariableKeyProvider {
     private static final String ATTRIBUTE_PREFIX = Brix.NS_PREFIX + "var:";
     private final Tag delegate;
     private final BrixNodeModel pageNodeModel;
+    private final String pageNodeKey;
 
     static String getKey(String value) {
         String key = null;
@@ -44,6 +47,7 @@ public class VariableTag implements Tag, VariableKeyProvider {
 
     public VariableTag(BrixNode pageNode, Tag delegate) {
         this.pageNodeModel = new BrixNodeModel(pageNode);
+        this.pageNodeKey = buildNodeKey(pageNode);
         this.pageNodeModel.detach();
         this.delegate = delegate;
     }
@@ -55,7 +59,7 @@ public class VariableTag implements Tag, VariableKeyProvider {
 
     public Map<String, String> getAttributeMap() {
         Map<String, String> original = getDelegate().getAttributeMap();
-        BrixNode pageNode = new BrixNodeModel(pageNodeModel).getObject();
+        BrixNode pageNode = getPageNode();
         if (pageNode instanceof VariableValueProvider variableValueProvider) {
             Map<String, String> result = new HashMap<String, String>();
             for (Entry<String, String> e : original.entrySet()) {
@@ -99,4 +103,33 @@ public class VariableTag implements Tag, VariableKeyProvider {
         }
         return result;
     }
+
+    private BrixNode getPageNode() {
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle != null && pageNodeKey != null) {
+            Map<String, BrixNode> cache = cycle.getMetaData(NODE_CACHE_KEY);
+            if (cache == null) {
+                cache = new HashMap<String, BrixNode>();
+                cycle.setMetaData(NODE_CACHE_KEY, cache);
+            }
+            BrixNode cached = cache.get(pageNodeKey);
+            if (cached != null) {
+                return cached;
+            }
+            BrixNode node = new BrixNodeModel(pageNodeModel).getObject();
+            cache.put(pageNodeKey, node);
+            return node;
+        }
+        return new BrixNodeModel(pageNodeModel).getObject();
+    }
+
+    private String buildNodeKey(BrixNode node) {
+        String workspace = node.getSession().getWorkspace().getName();
+        String nodeId = node.isNodeType("mix:referenceable") ? node.getIdentifier() : node.getPath();
+        return workspace + "-" + nodeId;
+    }
+
+    private static final MetaDataKey<Map<String, BrixNode>> NODE_CACHE_KEY =
+            new MetaDataKey<Map<String, BrixNode>>() {
+            };
 }

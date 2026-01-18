@@ -23,8 +23,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Contains {@link GeneratedMarkup} instances associated with {@link MarkupContainer}s. The {@link MarkupContainer}s
- * must also implement {@link MarkupSourceProvider} so that the cache can check if the {@link GeneratedMarkup} is still
- * valid and generate new one in case it is not.
+ * must also implement {@link MarkupSourceProvider} so that the cache can generate markup on demand and reuse it until
+ * explicitly invalidated.
  *
  * @author Matej Knopp
  */
@@ -33,8 +33,7 @@ public class MarkupCache {
 
     /**
      * Returns the {@link GeneratedMarkup} instance for given container. The container must implement {@link
-     * MarkupSourceProvider}. If the {@link GeneratedMarkup} instance is expired or not found, new {@link
-     * GeneratedMarkup} instance is generated and stored in the cache.
+     * MarkupSourceProvider}. Markup is regenerated only when explicitly invalidated.
      *
      * @param container
      * @return
@@ -46,17 +45,32 @@ public class MarkupCache {
         MarkupSourceProvider provider = (MarkupSourceProvider) container;
         final String key = getKey(container);
         GeneratedMarkup markup = map.get(key);
-        if (markup != null) {
-            // check if markup is still valid
-            if (provider.getMarkupSource().isMarkupExpired(markup.expirationToken)) {
-                markup = null;
-            }
-        }
         if (markup == null) {
             markup = new GeneratedMarkup(provider.getMarkupSource());
             map.put(key, markup);
         }
         return markup;
+    }
+
+    public void invalidate(BrixNode node) {
+        if (node == null) {
+            return;
+        }
+        String workspace = node.getSession().getWorkspace().getName();
+        String nodeId = getNodeId(node);
+        invalidate(workspace, nodeId);
+    }
+
+    public void invalidate(String workspace, String nodeId) {
+        if (workspace == null || nodeId == null) {
+            return;
+        }
+        String suffix = "-" + workspace + "-" + nodeId;
+        for (String key : map.keySet()) {
+            if (key.endsWith(suffix)) {
+                map.remove(key);
+            }
+        }
     }
 
     /**
@@ -69,13 +83,16 @@ public class MarkupCache {
         BrixNode node = container.getModelObject();
         String nodeId = "";
         if (node != null) {
-            if (node.isNodeType("mix:referenceable")) {
-                nodeId = node.getIdentifier();
-            } else {
-                nodeId = node.getPath();
-            }
+            nodeId = getNodeId(node);
         }
         String workspace = node.getSession().getWorkspace().getName();
         return container.getClass().getName() + "-" + workspace + "-" + nodeId;
+    }
+
+    private String getNodeId(BrixNode node) {
+        if (node.isNodeType("mix:referenceable")) {
+            return node.getIdentifier();
+        }
+        return node.getPath();
     }
 }

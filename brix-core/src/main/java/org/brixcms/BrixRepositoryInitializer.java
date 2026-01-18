@@ -19,6 +19,7 @@ import org.brixcms.jcr.RepositoryInitializer;
 import org.brixcms.jcr.RepositoryUtil;
 import org.brixcms.jcr.base.EventUtil;
 import org.brixcms.jcr.wrapper.BrixNode;
+import org.brixcms.markup.MarkupCacheInvalidationListener;
 import org.brixcms.plugin.site.folder.FolderNodePlugin;
 import org.brixcms.plugin.site.page.tile.TileContainerFacet;
 import org.slf4j.Logger;
@@ -59,6 +60,7 @@ public class BrixRepositoryInitializer implements RepositoryInitializer {
         }
 
         EventUtil.registerSaveEventListener(new JcrEventListener());
+        EventUtil.registerSaveEventListener(new MarkupCacheInvalidationListener(brix));
 
         //register the unstructured brix:unstructured base so it can be used as mixin
         RepositoryUtil.registerBrixUnstructuredMixin(w);

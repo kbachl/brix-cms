@@ -17,14 +17,11 @@ package org.brixcms.web;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
+import java.util.HashMap;
+import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -89,10 +86,6 @@ public class BrixRequestMapper extends AbstractComponentMapper {
     private static final Logger log = LoggerFactory.getLogger(BrixRequestMapper.class);
     private static final MetaDataKey<RequestPathCache> REQUEST_PATH_CACHE_KEY = new MetaDataKey<RequestPathCache>() {
     };
-    private static final String PATH_CACHE_SIZE_PROPERTY = "brix.mapper.pathCacheSize";
-    private static final int SHARED_PATH_CACHE_SIZE = Integer.getInteger(PATH_CACHE_SIZE_PROPERTY, 8192);
-    private static final ConcurrentMap<String, PathNodeCache> SHARED_PATH_CACHES = new ConcurrentHashMap<>();
-
     private final Brix brix;
     private final HttpsConfig config;
 
@@ -493,36 +486,15 @@ public class BrixRequestMapper extends AbstractComponentMapper {
             return requestCache.get(uriPathKey);
         }
 
-        final String workspace = WorkspaceUtils.getWorkspace();
-        final JcrSession session = brix.getCurrentSession(workspace);
-
-        PathNodeCache sharedCache = getSharedPathCache(workspace);
-        NodeReference reference = sharedCache != null ? sharedCache.get(uriPathKey) : null;
-
-        BrixNode node = resolveFromReference(session, reference);
-        String jcrPath = reference != null ? reference.jcrPath : null;
-        String nodeId = reference != null ? reference.nodeId : null;
-
-        if (node == null) {
-            final Path nodePath = brix.getConfig().getMapper().getNodePathForUriPath(uriPath.toAbsolute(), brix);
-            if (nodePath != null) {
-                jcrPath = SitePlugin.get().toRealWebNodePath(nodePath.toString());
-                if (session.itemExists(jcrPath)) {
-                    node = (BrixNode) session.getItem(jcrPath);
-                    nodeId = getNodeIdentifier(node);
-                }
+        BrixNode node = null;
+        final Path nodePath = brix.getConfig().getMapper().getNodePathForUriPath(uriPath.toAbsolute(), brix);
+        if (nodePath != null) {
+            final String jcrPath = SitePlugin.get().toRealWebNodePath(nodePath.toString());
+            final String workspace = WorkspaceUtils.getWorkspace();
+            final JcrSession session = brix.getCurrentSession(workspace);
+            if (session.itemExists(jcrPath)) {
+                node = (BrixNode) session.getItem(jcrPath);
             }
-
-            if (node == null && sharedCache != null && reference != null) {
-                sharedCache.remove(uriPathKey);
-            }
-        }
-
-        if (node != null && sharedCache != null && jcrPath != null) {
-            if (nodeId == null) {
-                nodeId = getNodeIdentifier(node);
-            }
-            sharedCache.put(uriPathKey, new NodeReference(jcrPath, nodeId));
         }
 
         if (requestCache != null) {
@@ -543,55 +515,6 @@ public class BrixRequestMapper extends AbstractComponentMapper {
             requestCycle.setMetaData(REQUEST_PATH_CACHE_KEY, cache);
         }
         return cache;
-    }
-
-    private PathNodeCache getSharedPathCache(String workspace) {
-        if (SHARED_PATH_CACHE_SIZE < 1) {
-            return null;
-        }
-        String key = workspace != null ? workspace : "";
-        return SHARED_PATH_CACHES.computeIfAbsent(key, ignored -> new PathNodeCache(SHARED_PATH_CACHE_SIZE));
-    }
-
-    private BrixNode resolveFromReference(JcrSession session, NodeReference reference) {
-        if (reference == null) {
-            return null;
-        }
-        BrixNode node = null;
-        if (reference.nodeId != null) {
-            try {
-                node = (BrixNode) session.getNodeByIdentifier(reference.nodeId);
-            } catch (JcrException e) {
-                node = null;
-            }
-            if (node != null && reference.jcrPath != null) {
-                try {
-                    if (!reference.jcrPath.equals(node.getPath())) {
-                        node = null;
-                    }
-                } catch (JcrException e) {
-                    node = null;
-                }
-            }
-        }
-        if (node == null && reference.jcrPath != null && session.itemExists(reference.jcrPath)) {
-            node = (BrixNode) session.getItem(reference.jcrPath);
-        }
-        return node;
-    }
-
-    private String getNodeIdentifier(BrixNode node) {
-        if (node == null) {
-            return null;
-        }
-        try {
-            if (node.isNodeType("mix:referenceable")) {
-                return node.getIdentifier();
-            }
-        } catch (JcrException e) {
-            return null;
-        }
-        return null;
     }
 
     /**
@@ -707,38 +630,4 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         }
     }
 
-    private static final class NodeReference {
-        private final String jcrPath;
-        private final String nodeId;
-
-        private NodeReference(String jcrPath, String nodeId) {
-            this.jcrPath = jcrPath;
-            this.nodeId = nodeId;
-        }
-    }
-
-    private static final class PathNodeCache {
-        private final LinkedHashMap<String, NodeReference> cache;
-
-        private PathNodeCache(final int maxSize) {
-            cache = new LinkedHashMap<String, NodeReference>(128, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, NodeReference> eldest) {
-                    return size() > maxSize;
-                }
-            };
-        }
-
-        synchronized NodeReference get(String uriPath) {
-            return cache.get(uriPath);
-        }
-
-        synchronized void put(String uriPath, NodeReference reference) {
-            cache.put(uriPath, reference);
-        }
-
-        synchronized void remove(String uriPath) {
-            cache.remove(uriPath);
-        }
-    }
 }

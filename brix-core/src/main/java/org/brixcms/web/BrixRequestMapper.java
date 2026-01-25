@@ -43,6 +43,7 @@ import org.apache.wicket.protocol.https.HttpsConfig;
 import org.apache.wicket.protocol.https.HttpsMapper;
 import org.apache.wicket.protocol.https.Scheme;
 import org.apache.wicket.request.IRequestHandler;
+import org.apache.wicket.request.IRequestParameters;
 import org.apache.wicket.request.Request;
 import org.apache.wicket.request.Url;
 import org.apache.wicket.request.Url.QueryParameter;
@@ -102,6 +103,9 @@ public class BrixRequestMapper extends AbstractComponentMapper {
             return null;
         }
 
+        final SitePlugin sitePlugin = SitePlugin.get();
+        final IRequestParameters requestParameters = request.getRequestParameters();
+
         // TODO: This is just a quick fix
         if (url.getSegments().size() > 0) {
             if (url.getSegments().get(0).equals("webdav") || url.getSegments().get(0).equals("jcrwebdav")) {
@@ -133,13 +137,12 @@ public class BrixRequestMapper extends AbstractComponentMapper {
                     node = getNodeForUriPath(path);
                 }
                 if (node != null) {
-                    SiteNodePlugin plugin = SitePlugin.get().getNodePluginForNode(node);
+                    SiteNodePlugin plugin = sitePlugin.getNodePluginForNode(node);
+                    BrixNodeModel nodeModel = new BrixNodeModel(node);
                     if (plugin instanceof AbstractSitePagePlugin) {
-                        handler = SitePlugin.get().getNodePluginForNode(node).respond(new BrixNodeModel(node),
-                                createBrixPageParams(request.getUrl(), path));
+                        handler = plugin.respond(nodeModel, createBrixPageParams(url, path));
                     } else {
-                        handler = SitePlugin.get().getNodePluginForNode(node).respond(new BrixNodeModel(node),
-                                new BrixPageParameters(request.getRequestParameters()));
+                        handler = plugin.respond(nodeModel, new BrixPageParameters(requestParameters));
                     }
                 }
                 if (handler != null || path.toString().equals(".")) {
@@ -156,7 +159,7 @@ public class BrixRequestMapper extends AbstractComponentMapper {
             log.warn("Tracing: Referer: {}",((WebRequest) request.getContainerRequest()).getHeader("referer"));
         }
 
-        final PageComponentInfo info = getPageComponentInfo(request.getUrl());
+        final PageComponentInfo info = getPageComponentInfo(url);
         if (info != null) {
             Integer renderCount = info.getComponentInfo() != null ? info.getComponentInfo().getRenderCount() : null;
 
@@ -199,12 +202,12 @@ public class BrixRequestMapper extends AbstractComponentMapper {
                 }
                 final BrixNode pageNode = getNodeForUriPath(finalPath);
                 PageAndComponentProvider provider = new PageAndComponentProvider(info.getPageInfo().getPageId(), PageRenderingPage.class,
-                        new BrixPageParameters(request.getRequestParameters()), renderCount, componentInfo.getComponentPath());
+                        new BrixPageParameters(requestParameters), renderCount, componentInfo.getComponentPath());
                 provider.setPageSource(new DefaultMapperContext() {
                     @Override
                     public IRequestablePage newPageInstance(Class<? extends IRequestablePage> pageClass, PageParameters pageParameters) {
                         return new PageRenderingPage(new BrixNodeModel(pageNode),
-                                createBrixPageParams(request.getUrl(), finalPath));
+                                createBrixPageParams(url, finalPath));
                     }
                 });
                 return new ListenerRequestHandler(provider, componentInfo.getBehaviorId());

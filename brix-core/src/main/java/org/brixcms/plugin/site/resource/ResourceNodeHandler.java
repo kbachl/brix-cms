@@ -18,7 +18,6 @@
 package org.brixcms.plugin.site.resource;
 
 import java.io.InputStream;
-import java.time.Instant;
 import java.util.Date;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +26,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.request.IRequestCycle;
 import org.apache.wicket.request.IRequestHandler;
-import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.string.Strings;
 import org.brixcms.Brix;
@@ -67,20 +65,22 @@ public class ResourceNodeHandler implements IRequestHandler {
 
 	@Override
 	public void respond(IRequestCycle requestCycle) {
-		boolean save = (this.save != null) ? this.save : Strings.isTrue(RequestCycle.get().getRequest().getRequestParameters()
+		boolean save = (this.save != null) ? this.save : Strings.isTrue(requestCycle.getRequest().getRequestParameters()
 				.getParameterValue(SAVE_PARAMETER).toString());
 
 		BrixFileNode node = (BrixFileNode) this.node.getObject();
+		String mimeType = node.getMimeType();
+		Date lastModified = node.getLastModified();
+		long contentLength = node.getContentLength();
 
 		if (!SitePlugin.get().canViewNode(node, Action.Context.PRESENTATION)) {
 			throw Brix.get().getForbiddenException();
 		}
 
-		WebResponse response = (WebResponse) RequestCycle.get().getResponse();
+		WebResponse response = (WebResponse) requestCycle.getResponse();
 
-		response.setContentType(node.getMimeType());
+		response.setContentType(mimeType);
 
-		Date lastModified = node.getLastModified();
 		response.setLastModifiedTime(lastModified.toInstant());
 
 		try {
@@ -95,7 +95,7 @@ public class ResourceNodeHandler implements IRequestHandler {
 						Date d = new Date(dateHeader);
 						// the weird toString comparison is to prevent comparing milliseconds
 						if (d.after(lastModified) || d.toString().equals(lastModified.toString())) {
-							response.setContentLength(node.getContentLength());
+							response.setContentLength(contentLength);
 							response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
 							return;
 						}
@@ -107,13 +107,12 @@ public class ResourceNodeHandler implements IRequestHandler {
 				}
 			}
 			String fileName = node.getName();
-			long length = node.getContentLength();
 			HttpServletResponse httpServletResponse = (HttpServletResponse) response.getContainerResponse();
-			httpServletResponse.setContentType(node.getMimeType());
-			httpServletResponse.setDateHeader("Last-Modified", node.getLastModified().getTime());
+			httpServletResponse.setContentType(mimeType);
+			httpServletResponse.setDateHeader("Last-Modified", lastModified.getTime());
 			InputStream stream = node.getDataAsStream();
 
-			new Streamer(length, stream, fileName, save, r, httpServletResponse).stream();
+			new Streamer(contentLength, stream, fileName, save, r, httpServletResponse).stream();
 		} catch (Exception e) {
 			if (isClientAbort(e)) {
 				log.debug("Client aborted while streaming resource (ignored): {}", rootMessage(e));

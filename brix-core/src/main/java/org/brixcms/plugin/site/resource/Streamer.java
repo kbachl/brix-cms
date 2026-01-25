@@ -22,6 +22,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 
 /**
  * Responds stream with support for Content-Range header.
@@ -113,7 +114,9 @@ class Streamer {
 
             s.skip(first);
 
-            final int bufferSize = (int) maxContentLengthForDirectStreamInBytes;
+            final int bufferSize = (int) Math.min(maxContentLengthForDirectStreamInBytes, Math.max(1L, contentLength));
+            final byte[] buf = new byte[bufferSize];
+            final OutputStream out = response.getOutputStream();
             long left = contentLength;
             while (left > 0) {
                 int howMuch = bufferSize;
@@ -121,11 +124,10 @@ class Streamer {
                     howMuch = (int) left;
                 }
 
-                byte[] buf = new byte[howMuch];
-                int numRead = s.read(buf);
+                int numRead = s.read(buf, 0, howMuch);
 
                 if(numRead > -1) {
-                    response.getOutputStream().write(buf, 0, numRead);
+                    out.write(buf, 0, numRead);
                 }
 
                 //only call flushBuffer if partial content delivery is active - saves roundtrip

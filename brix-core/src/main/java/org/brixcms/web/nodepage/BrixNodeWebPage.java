@@ -100,6 +100,10 @@ public class BrixNodeWebPage extends WebPage implements IGenericComponent<BrixNo
     }
 
     protected static String getMimeType(BrixNode brixNode) {
+        if (brixNode == null || !BrixFileNode.isFileNode(brixNode)) {
+            return "text/html";
+        }
+
         BrixFileNode brixFileNode = new BrixFileNode(brixNode.getDelegate(), brixNode.getSession());
 
         String mimeType = null;

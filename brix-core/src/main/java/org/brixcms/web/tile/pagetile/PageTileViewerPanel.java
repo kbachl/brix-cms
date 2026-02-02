@@ -43,15 +43,15 @@ public class PageTileViewerPanel extends BrixGenericPanel<BrixNode> {
         JcrNode tileNode = (JcrNode) getModelObject();
 
         if (checkLoop(getModel()) == true) {
-            add(new Label("view", "Loop detected."));
+            addOrReplace(new Label("view", "Loop detected."));
         } else {
             BrixNode pageNode = (BrixNode) (tileNode.hasProperty("pageNode") ? tileNode.getProperty("pageNode")
                     .getNode() : null);
 
             if (pageNode != null) {
-                add(new PageRenderingPanel("view", new BrixNodeModel(pageNode)));
+                addOrReplace(new PageRenderingPanel("view", new BrixNodeModel(pageNode)));
             } else {
-                add(new Label("view", "Page not found."));
+                addOrReplace(new Label("view", "Page not found."));
             }
         }
     }

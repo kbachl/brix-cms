@@ -27,13 +27,16 @@ import org.brixcms.jcr.wrapper.ResourceNode;
 
 import javax.jcr.Node;
 import javax.jcr.RepositoryException;
-import java.util.Collection;
+import java.util.List;
 
 public class SessionBehavior implements Behavior {
     private final Brix brix;
+    private final List<JcrNodeWrapperFactory> factories;
 
     public SessionBehavior(Brix brix) {
         this.brix = brix;
+        this.factories = List.copyOf(
+                brix.getConfig().getRegistry().lookupCollection(JcrNodeWrapperFactory.POINT));
     }
 
 
@@ -44,9 +47,6 @@ public class SessionBehavior implements Behavior {
         }
 
         JcrNode n = new NodeWrapper(node, session);
-
-        Collection<JcrNodeWrapperFactory> factories = brix.getConfig().getRegistry().lookupCollection(
-                JcrNodeWrapperFactory.POINT);
 
         for (JcrNodeWrapperFactory factory : factories) {
             if (factory.canWrap(brix, n)) {

@@ -17,7 +17,9 @@ package org.brixcms;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.jcr.RepositoryException;
 import javax.jcr.Session;
@@ -101,6 +103,8 @@ public abstract class Brix {
       */
 
     private AuthorizationStrategy authorizationStrategy = null;
+    private volatile Collection<Plugin> pluginCache;
+    private volatile Map<String, Plugin> pluginByIdCache;
 
     public static Brix get() {
         Application application = Application.get();
@@ -197,6 +201,21 @@ public abstract class Brix {
         this.config = config;
 
         final ExtensionPointRegistry registry = config.getRegistry();
+        registry.register(new ExtensionPointRegistry.Listener() {
+            @Override
+            public void registered(org.brixcms.registry.ExtensionPoint<?> point, Object extension) {
+                if (Plugin.POINT == point) {
+                    invalidatePluginCache();
+                }
+            }
+
+            @Override
+            public void unregistered(org.brixcms.registry.ExtensionPoint<?> point, Object extension) {
+                if (Plugin.POINT == point) {
+                    invalidatePluginCache();
+                }
+            }
+        }, false);
 
         registry.register(RepositoryInitializer.POINT, new BrixRepositoryInitializer());
 
@@ -334,14 +353,7 @@ public abstract class Brix {
         if (id == null) {
             throw new IllegalArgumentException("Argument 'id' may not be null.");
         }
-
-
-        for (Plugin p : getPlugins()) {
-            if (id.equals(p.getId())) {
-                return p;
-            }
-        }
-        return null;
+        return getPluginById().get(id);
     }
 
     public final WorkspaceManager getWorkspaceManager() {
@@ -399,7 +411,40 @@ public abstract class Brix {
     }
 
     public final Collection<Plugin> getPlugins() {
-        return config.getRegistry().lookupCollection(Plugin.POINT);
+        Collection<Plugin> cache = pluginCache;
+        if (cache == null) {
+            synchronized (this) {
+                cache = pluginCache;
+                if (cache == null) {
+                    Collection<Plugin> plugins = config.getRegistry().lookupCollection(Plugin.POINT);
+                    cache = List.copyOf(plugins);
+                    pluginCache = cache;
+
+                    Map<String, Plugin> byId = new HashMap<String, Plugin>(cache.size());
+                    for (Plugin plugin : cache) {
+                        byId.putIfAbsent(plugin.getId(), plugin);
+                    }
+                    pluginByIdCache = Collections.unmodifiableMap(byId);
+                }
+            }
+        }
+        return cache;
+    }
+
+    private Map<String, Plugin> getPluginById() {
+        Map<String, Plugin> byId = pluginByIdCache;
+        if (byId == null) {
+            getPlugins();
+            byId = pluginByIdCache;
+        }
+        return byId;
+    }
+
+    private void invalidatePluginCache() {
+        synchronized (this) {
+            pluginCache = null;
+            pluginByIdCache = null;
+        }
     }
 
     public HttpsConfig getHttpsConfig() {

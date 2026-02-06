@@ -226,30 +226,34 @@ public class SitePlugin implements SessionAwarePlugin {
         List<Workspace> workspaces = new ArrayList<Workspace>(brix.getWorkspaceManager()
                 .getWorkspacesFiltered(attributes));
 
-        Collections.sort(workspaces, new Comparator<Workspace>() {
-            public int compare(Workspace o1, Workspace o2) {
-                String n1 = getWorkspaceName(o1);
-                String n2 = getWorkspaceName(o2);
+        List<WorkspaceSortEntry> sortable = new ArrayList<WorkspaceSortEntry>(workspaces.size());
+        for (Workspace workspace : workspaces) {
+            sortable.add(new WorkspaceSortEntry(workspace, getWorkspaceName(workspace),
+                    getWorkspaceState(workspace)));
+        }
 
-                int r = n1.compareTo(n2);
-                if (r == 0) {
-                    String s1 = getWorkspaceState(o1);
-                    String s2 = getWorkspaceState(o2);
-
-                    if (s1 != null && s2 != null) {
-                        if (stateComparator != null) {
-                            return stateComparator.compare(s1, s2);
-                        } else {
-                            return s1.compareTo(s2);
-                        }
-                    } else {
-                        return 0;
-                    }
-                } else {
+        Collections.sort(sortable, new Comparator<WorkspaceSortEntry>() {
+            @Override
+            public int compare(WorkspaceSortEntry o1, WorkspaceSortEntry o2) {
+                int r = o1.name.compareTo(o2.name);
+                if (r != 0) {
                     return r;
                 }
+
+                if (o1.state != null && o2.state != null) {
+                    if (stateComparator != null) {
+                        return stateComparator.compare(o1.state, o2.state);
+                    }
+                    return o1.state.compareTo(o2.state);
+                }
+                return 0;
             }
         });
+
+        workspaces.clear();
+        for (WorkspaceSortEntry entry : sortable) {
+            workspaces.add(entry.workspace);
+        }
 
         return workspaces;
     }
@@ -774,6 +778,18 @@ public class SitePlugin implements SessionAwarePlugin {
             }
 
             handleNewNode(destAbsPath, null, brix.wrapSession(session), true);
+        }
+    }
+
+    private static final class WorkspaceSortEntry {
+        private final Workspace workspace;
+        private final String name;
+        private final String state;
+
+        private WorkspaceSortEntry(Workspace workspace, String name, String state) {
+            this.workspace = workspace;
+            this.name = name;
+            this.state = state;
         }
     }
 }

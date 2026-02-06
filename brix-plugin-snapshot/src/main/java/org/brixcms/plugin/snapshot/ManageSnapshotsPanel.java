@@ -50,8 +50,12 @@ import org.brixcms.web.BrixFeedbackPanel;
 import org.brixcms.web.generic.BrixGenericPanel;
 import org.brixcms.workspace.Workspace;
 import org.brixcms.workspace.WorkspaceModel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ManageSnapshotsPanel extends BrixGenericPanel<Workspace> {
+    private static final Logger log = LoggerFactory.getLogger(ManageSnapshotsPanel.class);
+
     public ManageSnapshotsPanel(String id, final IModel<Workspace> model) {
         super(id, model);
 
@@ -241,7 +245,7 @@ public class ManageSnapshotsPanel extends BrixGenericPanel<Workspace> {
 
                             getSession().info(ManageSnapshotsPanel.this.getString("restoreSuccessful"));
                         } catch (Exception e) {
-                            e.printStackTrace(System.err);            // <-- erzwingt Sichtbarkeit
+                            log.error("Failed to restore workspace from uploaded snapshot", e);
                             throw new BrixException(e);
                         }
                     }

@@ -90,8 +90,11 @@ import org.brixcms.web.tab.AbstractWorkspaceTab;
 import org.brixcms.web.tab.IBrixTab;
 import org.brixcms.workspace.JcrException;
 import org.brixcms.workspace.Workspace;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SitePlugin implements SessionAwarePlugin {
+    private static final Logger log = LoggerFactory.getLogger(SitePlugin.class);
     public static final String PREFIX = "site";
 
     public static final String WORKSPACE_ATTRIBUTE_STATE = "brix:site-state";
@@ -120,6 +123,8 @@ public class SitePlugin implements SessionAwarePlugin {
     private MarkupCache markupCache = new MarkupCache();
 
     private WebDavEventListener webDavEventListener = new WebDavEventListener();
+    private volatile Collection<SiteNodePlugin> nodePluginsCache;
+    private volatile Map<String, SiteNodePlugin> nodePluginByTypeCache;
 
     public static SitePlugin get() {
         return get(Brix.get());
@@ -139,6 +144,21 @@ public class SitePlugin implements SessionAwarePlugin {
 
         // register default editor
         ExtensionPointRegistry registry = brix.getConfig().getRegistry();
+        registry.register(new ExtensionPointRegistry.Listener() {
+            @Override
+            public void registered(org.brixcms.registry.ExtensionPoint<?> point, Object extension) {
+                if (SiteNodePlugin.POINT == point) {
+                    invalidateNodePluginCache();
+                }
+            }
+
+            @Override
+            public void unregistered(org.brixcms.registry.ExtensionPoint<?> point, Object extension) {
+                if (SiteNodePlugin.POINT == point) {
+                    invalidateNodePluginCache();
+                }
+            }
+        }, false);
         registry.register(MarkupEditorFactory.POINT, new SimpleMarkupEditorFactory());
 
         // register node types for tree renderer
@@ -426,16 +446,49 @@ public class SitePlugin implements SessionAwarePlugin {
     }
 
     public SiteNodePlugin getNodePluginForType(String type) {
-        for (SiteNodePlugin plugin : getNodePlugins()) {
-            if (plugin.getNodeType().equals(type)) {
-                return plugin;
-            }
+        SiteNodePlugin plugin = getNodePluginsByType().get(type);
+        if (plugin != null) {
+            return plugin;
         }
         return fallbackNodePlugin;
     }
 
     public Collection<SiteNodePlugin> getNodePlugins() {
-        return brix.getConfig().getRegistry().lookupCollection(SiteNodePlugin.POINT);
+        Collection<SiteNodePlugin> cache = nodePluginsCache;
+        if (cache == null) {
+            synchronized (this) {
+                cache = nodePluginsCache;
+                if (cache == null) {
+                    Collection<SiteNodePlugin> plugins = brix.getConfig().getRegistry().lookupCollection(
+                            SiteNodePlugin.POINT);
+                    cache = List.copyOf(plugins);
+                    nodePluginsCache = cache;
+
+                    Map<String, SiteNodePlugin> byType = new HashMap<String, SiteNodePlugin>(cache.size());
+                    for (SiteNodePlugin plugin : cache) {
+                        byType.putIfAbsent(plugin.getNodeType(), plugin);
+                    }
+                    nodePluginByTypeCache = Collections.unmodifiableMap(byType);
+                }
+            }
+        }
+        return cache;
+    }
+
+    private Map<String, SiteNodePlugin> getNodePluginsByType() {
+        Map<String, SiteNodePlugin> byType = nodePluginByTypeCache;
+        if (byType == null) {
+            getNodePlugins();
+            byType = nodePluginByTypeCache;
+        }
+        return byType;
+    }
+
+    private void invalidateNodePluginCache() {
+        synchronized (this) {
+            nodePluginsCache = null;
+            nodePluginByTypeCache = null;
+        }
     }
 
     public BrixNode getSiteRootNode(String workspaceId) {
@@ -548,7 +601,7 @@ public class SitePlugin implements SessionAwarePlugin {
         if(node != null) {
             jcrPath = SitePlugin.get().fromRealWebNodePath(node.getPath());
         } else {
-            System.out.println("jcrPath is empty due to node null!");
+            log.debug("jcrPath is empty due to node null");
             jcrPath = "";
         }
 

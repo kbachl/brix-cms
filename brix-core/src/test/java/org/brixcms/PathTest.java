@@ -18,6 +18,8 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
+import java.util.ArrayList;
 import java.util.Set;
 
 import static org.junit.Assert.*;
@@ -327,5 +329,23 @@ public class PathTest {
         assertEquals(new Path("bar"), new Path("/foo/bar").toRelative(new Path("/foo")));
 
         assertEquals(new Path("bar"), new Path("foo/bar").toRelative(new Path("foo")));
+    }
+
+    @Test
+    public void nonCanonicalSegmentsAndParent() {
+        Path nonCanonical = new Path("/a//b", false);
+        assertEquals(3, nonCanonical.size());
+        assertEquals("a", nonCanonical.part(0));
+        assertEquals("", nonCanonical.part(1));
+        assertEquals("b", nonCanonical.part(2));
+
+        List<String> parts = new ArrayList<String>();
+        for (String part : nonCanonical) {
+            parts.add(part);
+        }
+        assertEquals(Arrays.asList("a", "", "b"), parts);
+
+        assertEquals(new Path("/a"), nonCanonical.parent());
+        assertEquals(new Path("a"), new Path("a/./b", false).parent());
     }
 }

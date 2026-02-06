@@ -29,6 +29,7 @@ import java.util.List;
  */
 public final class Path implements Iterable<String>, Serializable {
     private static final String SEPARATOR = "/";
+    private static final int[] NO_SEGMENT_BOUNDS = new int[0];
     public static final Path ROOT = new Path(SEPARATOR);
 
     public static final Comparator<Path> SMALLEST_FIRST_COMPARATOR = new Comparator<Path>() {
@@ -45,7 +46,7 @@ public final class Path implements Iterable<String>, Serializable {
                 if (s1 == s2) {
                     return o1.path.compareTo(o2.path);
                 } else {
-                    return o1.size() - o2.size();
+                    return s1 - s2;
                 }
             }
         }
@@ -65,13 +66,17 @@ public final class Path implements Iterable<String>, Serializable {
                 if (s1 == s2) {
                     return o1.path.compareTo(o2.path);
                 } else {
-                    return o1.size() - o2.size();
+                    return s1 - s2;
                 }
             }
         }
 
     };
     private final String path;
+    private final boolean absolute;
+    private final boolean canonical;
+    private final int size;
+    private final int[] segmentBounds;
 
     public Path(String path) {
         this(path, true);
@@ -83,13 +88,18 @@ public final class Path implements Iterable<String>, Serializable {
         }
 
         if (canonize) {
-            path = new Path(path, false).canonical().path;
-        }
-
-        if (!path.equals("/") && path.endsWith(SEPARATOR)) {
-            this.path = path.substring(0, path.length() - 1);
+            Path canonicalPath = new Path(path, false).canonical();
+            this.path = canonicalPath.path;
+            this.absolute = canonicalPath.absolute;
+            this.canonical = true;
+            this.size = canonicalPath.size;
+            this.segmentBounds = canonicalPath.segmentBounds;
         } else {
-            this.path = path;
+            this.path = normalizePath(path);
+            this.absolute = this.path.startsWith(SEPARATOR);
+            this.canonical = isCanonicalPath(this.path);
+            this.size = computeSize(this.path);
+            this.segmentBounds = createSegmentBounds(this.path, this.size);
         }
     }
 
@@ -102,6 +112,56 @@ public final class Path implements Iterable<String>, Serializable {
     }
 
     public boolean isCanonical() {
+        return canonical;
+    }
+
+    public boolean isRoot() {
+        return path.equals(SEPARATOR);
+    }
+
+    private static String normalizePath(String path) {
+        if (!path.equals(SEPARATOR) && path.endsWith(SEPARATOR)) {
+            return path.substring(0, path.length() - 1);
+        } else {
+            return path;
+        }
+    }
+
+    private static int computeSize(String path) {
+        if (path.equals(SEPARATOR)) {
+            return 0;
+        }
+
+        int size = 0;
+        int pos = 0;
+        while (pos >= 0) {
+            size++;
+            pos = path.indexOf(SEPARATOR, pos + 1);
+        }
+        return size;
+    }
+
+    private static int[] createSegmentBounds(String path, int size) {
+        if (size == 0) {
+            return NO_SEGMENT_BOUNDS;
+        }
+
+        int[] bounds = new int[size * 2];
+        int start = path.startsWith(SEPARATOR) ? 1 : 0;
+        int boundPos = 0;
+        while (boundPos < bounds.length) {
+            int end = path.indexOf(SEPARATOR, start);
+            if (end < 0) {
+                end = path.length();
+            }
+            bounds[boundPos++] = start;
+            bounds[boundPos++] = end;
+            start = end + 1;
+        }
+        return bounds;
+    }
+
+    private static boolean isCanonicalPath(String path) {
         int offset = 0;
 
         // whether a text segment (not "..") has been found
@@ -112,7 +172,7 @@ public final class Path implements Iterable<String>, Serializable {
             return true;
         }
 
-        if (!isRoot() && path.endsWith("/")) {
+        if (!path.equals(SEPARATOR) && path.endsWith("/")) {
             return false;
         }
 
@@ -149,10 +209,6 @@ public final class Path implements Iterable<String>, Serializable {
         }
 
         return true;
-    }
-
-    public boolean isRoot() {
-        return path.equals(SEPARATOR);
     }
 
     private Path doCanonical() {
@@ -200,7 +256,7 @@ public final class Path implements Iterable<String>, Serializable {
     }
 
     public boolean isAbsolute() {
-        return path.startsWith("/");
+        return absolute;
     }
 
     @Override
@@ -244,7 +300,7 @@ public final class Path implements Iterable<String>, Serializable {
             int idx = 0;
 
             public boolean hasNext() {
-                return idx < size();
+                return idx < size;
             }
 
             public String next() {
@@ -293,47 +349,47 @@ public final class Path implements Iterable<String>, Serializable {
     }
 
     public int size() {
-        if (isRoot()) {
-            return 0;
-        }
-
-        int size = 0;
-        int pos = 0;
-        while (pos >= 0) {
-            size++;
-            pos = path.indexOf(SEPARATOR, pos + 1);
-        }
         return size;
     }
 
     public Path parent() {
         if (isRoot()) {
             return null;
-        } else {
+        }
+        if (!canonical) {
             return new Path(path + "/..");
+        }
+        if (path.equals(".")) {
+            return new Path("..", false);
+        }
+
+        String last = part(size - 1);
+        if (last.equals("..")) {
+            return new Path(path + "/..", false);
+        }
+
+        if (absolute) {
+            if (size == 1) {
+                return ROOT;
+            }
+            int end = segmentBounds[(size - 2) * 2 + 1];
+            return new Path(path.substring(0, end), false);
+        } else {
+            if (size == 1) {
+                return new Path(".", false);
+            }
+            int end = segmentBounds[(size - 2) * 2 + 1];
+            return new Path(path.substring(0, end), false);
         }
     }
 
     public String part(int index) {
-        if (index < 0) {
+        if (index < 0 || index >= size) {
             throw new IndexOutOfBoundsException();
         }
 
-        int start = isAbsolute() ? 1 : 0;
-
-        for (int i = 0; i < index; i++) {
-            start = path.indexOf(SEPARATOR, start);
-            if (start < 0) {
-                throw new IndexOutOfBoundsException();
-            }
-            start++;
-        }
-
-        int end = path.indexOf(SEPARATOR, start);
-        if (end < 0) {
-            end = path.length();
-        }
-
+        int start = segmentBounds[index * 2];
+        int end = segmentBounds[index * 2 + 1];
         return path.substring(start, end);
     }
 
@@ -342,7 +398,6 @@ public final class Path implements Iterable<String>, Serializable {
             throw new IndexOutOfBoundsException();
         }
 
-        final int size = size();
         final boolean abs = isAbsolute();
         int chunks = (abs) ? size + 1 : size;
 
@@ -355,17 +410,11 @@ public final class Path implements Iterable<String>, Serializable {
             return this;
         }
 
-        int iterations = ((abs) ? idx - 1 : idx);
-        int end = 1;
-
-        for (int i = 0; i < iterations; i++) {
-            end = path.indexOf(SEPARATOR, end + 1);
+        if (abs && idx == 1) {
+            return ROOT;
         }
 
-        if (end == 0) {
-            return new Path("/");
-        }
-
+        int end = abs ? segmentBounds[(idx - 2) * 2 + 1] : segmentBounds[(idx - 1) * 2 + 1];
         String newPath = path.substring(0, end);
 
         return new Path(newPath);

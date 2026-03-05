@@ -78,6 +78,7 @@ import org.brixcms.web.nodepage.BrixNodeRequestHandler;
 import org.brixcms.web.nodepage.BrixNodeWebPage;
 import org.brixcms.web.nodepage.BrixPageParameters;
 import org.brixcms.web.nodepage.PageParametersAware;
+import org.brixcms.web.reference.Reference;
 import org.brixcms.workspace.WorkspaceUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,11 +123,21 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         Path path = new Path("/" + url.getPath());
 
         BrixNode node = null;
+        BrixNode rootRedirectTarget = null;
+        BrixPageParameters rootRedirectParameters = null;
         // root path handling
         if (path.isRoot()) {
             node = getNodeForUriPath(path);
             if(node instanceof FolderNode folderNode) {
-                node = folderNode.getRedirectReference().getNodeModel().getObject();
+                Reference redirectReference = folderNode.getRedirectReference();
+                BrixNode redirectTarget = redirectReference != null ? redirectReference.getNodeTarget() : null;
+                if (redirectTarget != null) {
+                    node = redirectTarget;
+                    rootRedirectTarget = redirectTarget;
+                    rootRedirectParameters = redirectReference.getParameters() != null
+                            ? new BrixPageParameters(redirectReference.getParameters())
+                            : new BrixPageParameters();
+                }
             }
         }
 
@@ -139,10 +150,13 @@ public class BrixRequestMapper extends AbstractComponentMapper {
                 if (node != null) {
                     SiteNodePlugin plugin = sitePlugin.getNodePluginForNode(node);
                     BrixNodeModel nodeModel = new BrixNodeModel(node);
+                    BrixPageParameters pageParameters = node == rootRedirectTarget && rootRedirectParameters != null
+                            ? new BrixPageParameters(rootRedirectParameters)
+                            : createBrixPageParams(url, path);
                     if (plugin instanceof AbstractSitePagePlugin) {
-                        handler = plugin.respond(nodeModel, createBrixPageParams(url, path));
+                        handler = plugin.respond(nodeModel, pageParameters);
                     } else {
-                        handler = plugin.respond(nodeModel, new BrixPageParameters(requestParameters));
+                        handler = plugin.respond(nodeModel, pageParameters);
                     }
                 }
                 if (handler != null || path.toString().equals(".")) {

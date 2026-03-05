@@ -23,9 +23,12 @@ public class ReferenceRequestHandler extends RedirectRequestHandler {
         super(referenceToUrl(reference));
     }
 
-    private static String referenceToUrl(Reference reference) {
+    static String referenceToUrl(Reference reference) {
         if (reference == null) {
             throw new IllegalArgumentException("reference cannot be null");
+        }
+        if (reference.isEmpty()) {
+            return "/";
         }
         String url = reference.generateUrl();
         if (Strings.isEmpty(url)) {

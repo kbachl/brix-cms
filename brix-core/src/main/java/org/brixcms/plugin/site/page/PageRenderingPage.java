@@ -15,6 +15,7 @@
 package org.brixcms.plugin.site.page;
 
 import org.apache.wicket.model.IModel;
+import org.brixcms.exception.NodeNotFoundException;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.markup.MarkupSource;
 import org.brixcms.markup.title.TitleTransformer;
@@ -48,12 +49,19 @@ public class PageRenderingPage extends BrixMarkupNodeWebPage {
 
     public MarkupSource getMarkupSource() {
 
-        if(getModelObject() instanceof SiteRootNode) {
-            BrixNode targetNode = ((FolderNode) getModelObject()).getRedirectReference().getNodeModel().getObject();
+        if (getModelObject() instanceof SiteRootNode siteRootNode) {
+            BrixNode targetNode = siteRootNode.getRedirectReference().getNodeTarget();
+            if (!(targetNode instanceof AbstractContainer)) {
+                throw new NodeNotFoundException("Site root redirect target not found.");
+            }
             setModelObject(targetNode);
         }
 
-        MarkupSource source = new PageMarkupSource((AbstractContainer) getModelObject());
-        return transform(source, (AbstractContainer) getModelObject());
+        if (!(getModelObject() instanceof AbstractContainer container)) {
+            throw new NodeNotFoundException("Page node is not renderable.");
+        }
+
+        MarkupSource source = new PageMarkupSource(container);
+        return transform(source, container);
     }
 }

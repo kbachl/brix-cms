@@ -221,6 +221,10 @@ public class Reference implements Serializable, IDetachable {
         };
     }
 
+    public BrixNode getNodeTarget() {
+        return getType() == Type.NODE ? getNodeModel().getObject() : null;
+    }
+
     public void makeEmpty() {
         if (type == Type.URL) {
             setUrl(null);
@@ -284,7 +288,7 @@ public class Reference implements Serializable, IDetachable {
         if (type == Type.URL) {
             return Strings.isEmpty(getUrl());
         } else if (type == Type.NODE) {
-            return getNodeModel().getObject() == null;
+            return getNodeTarget() == null;
         } else {
             return false;
         }

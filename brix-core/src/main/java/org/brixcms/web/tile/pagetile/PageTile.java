@@ -22,6 +22,7 @@ import org.apache.wicket.MetaDataKey;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.brixcms.Path;
+import org.brixcms.jcr.JcrUtil;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.page.AbstractContainer;
@@ -76,8 +77,9 @@ public class PageTile implements Tile {
         final boolean result;
 
         if (tileNode.getObject().hasProperty("pageNode")) {
-            JcrNode pageNode = tileNode.getObject().getProperty("pageNode").getNode();
-            result = ((AbstractContainer) pageNode).requiresSSL();
+            String identifier = tileNode.getObject().getProperty("pageNode").getString();
+            JcrNode pageNode = JcrUtil.getNodeByUUID(tileNode.getObject().getSession(), identifier);
+            result = pageNode instanceof AbstractContainer && ((AbstractContainer) pageNode).requiresSSL();
         } else {
             result = false;
         }

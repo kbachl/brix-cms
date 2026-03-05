@@ -72,7 +72,9 @@ public class Reference implements Serializable, IDetachable {
     public void load(BrixNode node) {
         setType(Type.valueOf(node.getProperty("type").getString()));
         if (node.hasProperty("node")) {
-            setNodeModel(new BrixNodeModel((BrixNode) node.getProperty("node").getNode()));
+            String identifier = node.getProperty("node").getString();
+            String workspaceName = node.getSession().getWorkspace().getName();
+            setNodeModel(new BrixNodeModel(identifier, workspaceName));
         }
         if (node.hasProperty("url")) {
             setUrl(node.getProperty("url").getString());

@@ -17,8 +17,14 @@
  */
 package org.brixcms;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import org.apache.wicket.MetaDataKey;
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.util.lang.Objects;
+import org.brixcms.jcr.JcrUtil;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.jcr.wrapper.BrixNode;
@@ -27,6 +33,10 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
     private String id;
     private String workspaceName;
     private transient T node;
+    private transient boolean loaded;
+
+    private static final MetaDataKey<Set<String>> MISSING_IDENTIFIER_CACHE_KEY = new MetaDataKey<Set<String>>() {
+    };
 
     public BrixNodeModel() {
         this((T) null);
@@ -34,6 +44,7 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
 
     public BrixNodeModel(T node) {
         this.node = node;
+        this.loaded = true;
         if (node != null) {
             this.id = getId(node);
             this.workspaceName = node.getSession().getWorkspace().getName();
@@ -54,12 +65,14 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
         }
         this.id = other.id;
         this.node = null;
+        this.loaded = false;
         this.workspaceName = other.workspaceName;
     }
 
     public BrixNodeModel(String id, String workspaceName) {
         this.id = id;
         this.node = null;
+        this.loaded = false;
         this.workspaceName = workspaceName;
     }
 
@@ -103,11 +116,13 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
 
     public void detach() {
         node = null;
+        loaded = false;
     }
 
     public T getObject() {
-        if (node == null) {
+        if (!loaded) {
             node = loadNode(id);
+            loaded = true;
         }
         return node;
     }
@@ -117,23 +132,73 @@ public class BrixNodeModel<T extends BrixNode> implements IModel<T> {
             id = null;
             workspaceName = null;
             this.node = null;
+            this.loaded = true;
         } else {
             this.node = node;
             this.id = getId(node);
             this.workspaceName = node.getSession().getWorkspace().getName();
+            this.loaded = true;
         }
     }
 
-    private T loadNode(String id) {
-        if (id != null) {
-            JcrSession session = Brix.get().getCurrentSession(workspaceName);
-            if (id.startsWith("/")) {
-                return (T) session.getItem(id);
-            } else {
-                return (T) session.getNodeByIdentifier(id);
-            }
-        } else {
+    protected T loadNode(String id) {
+        if (id == null) {
             return null;
         }
+        JcrSession session = getCurrentSession(workspaceName);
+        if (id.startsWith("/")) {
+            return loadByPath(session, id);
+        }
+        return loadByIdentifier(session, id);
+    }
+
+    protected JcrSession getCurrentSession(String workspaceName) {
+        return Brix.get().getCurrentSession(workspaceName);
+    }
+
+    @SuppressWarnings("unchecked")
+    protected T loadByPath(JcrSession session, String path) {
+        if (!session.nodeExists(path)) {
+            return null;
+        }
+        return (T) session.getNode(path);
+    }
+
+    @SuppressWarnings("unchecked")
+    protected T loadByIdentifier(JcrSession session, String identifier) {
+        if (isKnownMissing(identifier)) {
+            return null;
+        }
+        T resolved = (T) JcrUtil.getNodeByUUID(session, identifier);
+        if (resolved == null) {
+            rememberMissing(identifier);
+        }
+        return resolved;
+    }
+
+    private boolean isKnownMissing(String identifier) {
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null || workspaceName == null) {
+            return false;
+        }
+        Set<String> missing = cycle.getMetaData(MISSING_IDENTIFIER_CACHE_KEY);
+        return missing != null && missing.contains(getMissingIdentifierCacheKey(identifier));
+    }
+
+    private void rememberMissing(String identifier) {
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null || workspaceName == null) {
+            return;
+        }
+        Set<String> missing = cycle.getMetaData(MISSING_IDENTIFIER_CACHE_KEY);
+        if (missing == null) {
+            missing = new HashSet<String>();
+            cycle.setMetaData(MISSING_IDENTIFIER_CACHE_KEY, missing);
+        }
+        missing.add(getMissingIdentifierCacheKey(identifier));
+    }
+
+    private String getMissingIdentifierCacheKey(String identifier) {
+        return workspaceName + ":" + identifier;
     }
 }

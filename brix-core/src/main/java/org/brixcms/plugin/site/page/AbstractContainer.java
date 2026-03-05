@@ -16,6 +16,7 @@ package org.brixcms.plugin.site.page;
 
 import org.brixcms.Brix;
 import org.brixcms.exception.NodeNotFoundException;
+import org.brixcms.jcr.JcrUtil;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrPropertyIterator;
 import org.brixcms.jcr.api.JcrSession;
@@ -145,7 +146,8 @@ public abstract class AbstractContainer extends BrixFileNode
 
     public TemplateNode getTemplate() {
         if (hasProperty(Properties.TEMPLATE)) {
-            return (TemplateNode) getProperty(Properties.TEMPLATE).getNode();
+            String identifier = getProperty(Properties.TEMPLATE).getString();
+            return (TemplateNode) JcrUtil.getNodeByUUID(getSession(), identifier);
         } else {
             return null;
         }

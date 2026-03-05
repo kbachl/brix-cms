@@ -20,6 +20,7 @@ import org.apache.wicket.model.IModel;
 import org.apache.wicket.util.visit.IVisit;
 import org.apache.wicket.util.visit.IVisitor;
 import org.brixcms.BrixNodeModel;
+import org.brixcms.jcr.JcrUtil;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.page.PageRenderingPanel;
@@ -45,8 +46,11 @@ public class PageTileViewerPanel extends BrixGenericPanel<BrixNode> {
         if (checkLoop(getModel()) == true) {
             addOrReplace(new Label("view", "Loop detected."));
         } else {
-            BrixNode pageNode = (BrixNode) (tileNode.hasProperty("pageNode") ? tileNode.getProperty("pageNode")
-                    .getNode() : null);
+            BrixNode pageNode = null;
+            if (tileNode.hasProperty("pageNode")) {
+                String identifier = tileNode.getProperty("pageNode").getString();
+                pageNode = JcrUtil.getNodeByUUID(tileNode.getSession(), identifier);
+            }
 
             if (pageNode != null) {
                 addOrReplace(new PageRenderingPanel("view", new BrixNodeModel(pageNode)));

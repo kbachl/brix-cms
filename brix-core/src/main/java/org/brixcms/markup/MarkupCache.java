@@ -44,12 +44,7 @@ public class MarkupCache {
         }
         MarkupSourceProvider provider = (MarkupSourceProvider) container;
         final String key = getKey(container);
-        GeneratedMarkup markup = map.get(key);
-        if (markup == null) {
-            markup = new GeneratedMarkup(provider.getMarkupSource());
-            map.put(key, markup);
-        }
-        return markup;
+        return map.computeIfAbsent(key, ignored -> new GeneratedMarkup(provider.getMarkupSource()));
     }
 
     public void invalidate(BrixNode node) {

@@ -90,7 +90,10 @@ public class BrixNodeRequestHandler implements IPageRequestHandler {
     }
 
     public void detach(IRequestCycle requestCycle) {
-
+        if (page != null) {
+            page.detach();
+        }
+        nodeModel.detach();
     }
 
     public String getNodeURL() {

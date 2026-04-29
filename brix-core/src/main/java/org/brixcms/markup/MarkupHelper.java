@@ -55,6 +55,7 @@ public class MarkupHelper implements Serializable {
      */
     private void initMarkup() {
         final Set<String> components = new HashSet<String>();
+        final Set<String> existingComponents = getExistingComponents();
         GeneratedMarkup markup = getMarkupCache().getMarkup(component);
 
         MarkupRenderer renderer = new MarkupRenderer(markup.items, markup.doctype) {
@@ -65,7 +66,7 @@ public class MarkupHelper implements Serializable {
                     String id = getComponentID(componentTag);
 
                     // check if the component already is in hierarchy
-                    if (getExistingComponents().contains(id)) {
+                    if (existingComponents.contains(id)) {
                         // just put the wicket:id attribute to component tag
                         attributes.put("wicket:id", id);
                         components.add(id);
@@ -76,6 +77,7 @@ public class MarkupHelper implements Serializable {
                             attributes.put("wicket:id", id);
                             components.add(id);
                             ((MarkupContainer) component).add(c);
+                            existingComponents.add(id);
                         }
                     }
                 }
@@ -85,7 +87,7 @@ public class MarkupHelper implements Serializable {
 
         // go through existing components and remove those not present in
         // current markup
-        for (String s : getExistingComponents()) {
+        for (String s : existingComponents) {
             if (!components.contains(s)) {
                 ((MarkupContainer) component).get(s).remove();
             }

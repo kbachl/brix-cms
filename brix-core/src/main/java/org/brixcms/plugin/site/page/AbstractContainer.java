@@ -103,7 +103,14 @@ public abstract class AbstractContainer extends BrixFileNode
 
     public boolean requiresSSL() {
         Boolean requiresSSL = isRequiresSSL();
-        return (requiresSSL != null && requiresSSL.booleanValue()) || tileManager.anyTileRequiresSSL() || (getTemplate() != null && getTemplate().requiresSSL());
+        if (requiresSSL != null && requiresSSL.booleanValue()) {
+            return true;
+        }
+        if (tileManager.anyTileRequiresSSL()) {
+            return true;
+        }
+        TemplateNode template = getTemplate();
+        return template != null && template.requiresSSL();
     }
 
     public Boolean isRequiresSSL() {
@@ -118,7 +125,11 @@ public abstract class AbstractContainer extends BrixFileNode
         // ignore tiles assuming that tiles which don't require SSL are equivalent to Protocol.PRESERVE_CURRENT
         // in future could add method: Protocol getRequiredProtocol() to Tile
         Boolean requiresSSL = isRequiresSSL();
-        return (requiresSSL != null && !requiresSSL.booleanValue()) || (getTemplate() != null && getTemplate().requiresNonSSL());
+        if (requiresSSL != null && !requiresSSL.booleanValue()) {
+            return true;
+        }
+        TemplateNode template = getTemplate();
+        return template != null && template.requiresNonSSL();
     }
 
     public List<String> getSavedVariableKeys() {

@@ -54,6 +54,10 @@ public class BrixNodePageRequestHandler extends RenderPageRequestHandler
         return (BrixNodeWebPage) super.getPage();
     }
 
+    public IModel<BrixNode> getNodeModel() {
+        return node;
+    }
+
     // ------------------------ INTERFACE METHODS ------------------------
 
     // --------------------- Interface IRequestHandler ---------------------

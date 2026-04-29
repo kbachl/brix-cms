@@ -599,7 +599,11 @@ public class BrixRequestMapper extends AbstractComponentMapper {
      */
     protected Scheme getDesiredSchemeFor(IRequestHandler handler) {
         if (handler instanceof BrixNodePageRequestHandler requestHandler) {
-            BrixNode.Protocol protocol = requestHandler.getPage().getPageNode().getRequiredProtocol();
+            BrixNode node = requestHandler.getNodeModel().getObject();
+            if (node == null) {
+                return Scheme.ANY;
+            }
+            BrixNode.Protocol protocol = node.getRequiredProtocol();
             switch (protocol) {
             case HTTP:
                 return Scheme.HTTP;

@@ -20,6 +20,7 @@ import org.apache.wicket.util.lang.Bytes;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -47,28 +48,28 @@ class Streamer {
         this.attachment = attachment;
     }
 
-    final static long maxContentLengthForDirectStreamInBytes = Bytes.kilobytes(512).bytes();
+    private static final int BUFFER_SIZE = (int) Bytes.kilobytes(64).bytes();
 
     public void stream() {
         Range range = parseRange(request.getHeader("Range"), length);
-        Long first = range.start;
-        Long last = range.end;
+        long first = 0;
+        long last = length - 1;
         long contentLength = length;
-        boolean isFlushingRequired = false;
 
-        if(contentLength > maxContentLengthForDirectStreamInBytes) {
-            isFlushingRequired = true;
-        }
-
-        if (first != null && last != null) {
+        if (range.unsatisfiable) {
+            response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
+            response.setHeader("Content-Range", "bytes */" + length);
+            response.setContentLengthLong(0);
+            closeInputStream();
+            return;
+        } else if (range.partial) {
+            first = range.start;
+            last = range.end;
             response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
             response.setHeader("Content-Range", "bytes " + first + "-" + last + "/" + length);
-
             contentLength = last - first + 1;
         } else {
             response.setStatus(HttpServletResponse.SC_OK);
-            first = 0l;
-            last = length - 1;
         }
 
         //let container do it via setContentLengthLong
@@ -112,9 +113,9 @@ class Streamer {
 
             s = new BufferedInputStream(inputStream);
 
-            s.skip(first);
+            skipFully(s, first);
 
-            final int bufferSize = (int) Math.min(maxContentLengthForDirectStreamInBytes, Math.max(1L, contentLength));
+            final int bufferSize = (int) Math.min(BUFFER_SIZE, Math.max(1L, contentLength));
             final byte[] buf = new byte[bufferSize];
             final OutputStream out = response.getOutputStream();
             long left = contentLength;
@@ -126,20 +127,19 @@ class Streamer {
 
                 int numRead = s.read(buf, 0, howMuch);
 
-                if(numRead > -1) {
-                    out.write(buf, 0, numRead);
-                }
-
-                //only call flushBuffer if partial content delivery is active - saves roundtrip
-                if(isFlushingRequired) {
-                    response.flushBuffer();
-                }
-
                 if (numRead == -1) {
-                    break;
+                    throw new EOFException("Resource stream ended with " + left + " bytes left to write");
+                } else if (numRead == 0) {
+                    int singleByte = s.read();
+                    if (singleByte == -1) {
+                        throw new EOFException("Resource stream ended with " + left + " bytes left to write");
+                    }
+                    out.write(singleByte);
+                    left--;
+                } else {
+                    out.write(buf, 0, numRead);
+                    left -= numRead;
                 }
-
-                left -= numRead;
             }
         } catch (Exception e) {
             if (e.getClass().getName().contains("Eof")) {
@@ -157,31 +157,63 @@ class Streamer {
         }
     }
 
+    private void closeInputStream() {
+        try {
+            inputStream.close();
+        } catch (IOException ignore) {
+        }
+    }
+
+    private void skipFully(InputStream s, long bytes) throws IOException {
+        long left = bytes;
+        while (left > 0) {
+            long skipped = s.skip(left);
+            if (skipped > 0) {
+                left -= skipped;
+            } else if (s.read() == -1) {
+                throw new EOFException("Resource stream ended while skipping to byte " + bytes);
+            } else {
+                left--;
+            }
+        }
+    }
+
     private Range parseRange(String range, long length) {
         if (isEmpty(range)) {
-            return new Range(null, null);
+            return Range.full();
         }
-        String p[] = range.split("=");
 
-        if (p.length != 1 && (p.length != 2 || !"bytes".equals(p[0]))) {
-            return new Range(0l, length - 1);
-        } else {
-            p = p[p.length - 1].split("-");
-            if (p.length == 1) {
-                p = new String[]{p[0], ""};
+        if (length <= 0 || !range.startsWith("bytes=") || range.indexOf(',') != -1) {
+            return length <= 0 ? Range.unsatisfiable() : Range.full();
+        }
+
+        String[] p = range.substring("bytes=".length()).split("-", -1);
+        if (p.length != 2 || (isEmpty(p[0]) && isEmpty(p[1]))) {
+            return Range.full();
+        }
+
+        try {
+            if (isEmpty(p[0])) {
+                long suffixLength = Long.valueOf(p[1]);
+                if (suffixLength <= 0) {
+                    return Range.unsatisfiable();
+                }
+                long start = Math.max(length - suffixLength, 0);
+                return Range.partial(start, length - 1);
             }
-            if (p.length != 2) {
-                return new Range(0l, length - 1);
+
+            long start = Long.valueOf(p[0]);
+            if (start < 0 || start >= length) {
+                return Range.unsatisfiable();
             }
-            if (isEmpty(p[0]) && isEmpty(p[1])) {
-                return new Range(0l, length - 1);
-            } else if (isEmpty(p[0])) {
-                return new Range(length - Long.valueOf(p[1]), length - 1);
-            } else if (isEmpty(p[1])) {
-                return new Range(Long.valueOf(p[0]), length - 1);
-            } else {
-                return new Range(Long.valueOf(p[0]), Long.valueOf(p[1]));
+
+            long end = isEmpty(p[1]) ? length - 1 : Long.valueOf(p[1]);
+            if (end < start) {
+                return Range.unsatisfiable();
             }
+            return Range.partial(start, Math.min(end, length - 1));
+        } catch (NumberFormatException e) {
+            return Range.full();
         }
     }
 
@@ -190,12 +222,28 @@ class Streamer {
     }
 
     private static class Range {
-        final Long start;
-        final Long end;
+        final long start;
+        final long end;
+        final boolean partial;
+        final boolean unsatisfiable;
 
-        public Range(Long start, Long end) {
+        private Range(long start, long end, boolean partial, boolean unsatisfiable) {
             this.start = start;
             this.end = end;
+            this.partial = partial;
+            this.unsatisfiable = unsatisfiable;
+        }
+
+        private static Range full() {
+            return new Range(0, 0, false, false);
+        }
+
+        private static Range partial(long start, long end) {
+            return new Range(start, end, true, false);
+        }
+
+        private static Range unsatisfiable() {
+            return new Range(0, 0, false, true);
         }
     }
 }

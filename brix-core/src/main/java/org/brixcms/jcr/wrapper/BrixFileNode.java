@@ -24,6 +24,7 @@ import org.brixcms.plugin.site.resource.ResourceNodePlugin;
 import javax.jcr.Binary;
 import javax.jcr.Node;
 import javax.jcr.RepositoryException;
+import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -218,7 +219,9 @@ public class BrixFileNode extends BrixNode {
      * @throws IOException
      */
     public void writeData(OutputStream stream) throws IOException {
-        Streams.copy(getDataAsStream(), stream);
+        try (InputStream data = getDataAsStream()) {
+            Streams.copy(data, stream);
+        }
     }
 
     /**
@@ -228,7 +231,17 @@ public class BrixFileNode extends BrixNode {
      */
     public InputStream getDataAsStream() {
         try {
-            return getContent().getProperty("jcr:data").getBinary().getStream();
+            Binary binary = getContent().getProperty("jcr:data").getBinary();
+            return new FilterInputStream(binary.getStream()) {
+                @Override
+                public void close() throws IOException {
+                    try {
+                        super.close();
+                    } finally {
+                        binary.dispose();
+                    }
+                }
+            };
         }
         catch (RepositoryException e) {
             throw new RuntimeException(e);

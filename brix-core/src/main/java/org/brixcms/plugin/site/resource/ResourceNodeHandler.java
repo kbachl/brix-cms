@@ -148,5 +148,6 @@ public class ResourceNodeHandler implements IRequestHandler {
 
 	@Override
 	public void detach(IRequestCycle requestCycle) {
+		node.detach();
 	}
 }

@@ -14,6 +14,7 @@
 
 package org.brixcms.plugin.site.resource;
 
+import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.lang.Bytes;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,7 +23,6 @@ import java.io.BufferedInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 
 /**
  * Responds stream with support for Content-Range header.
@@ -35,16 +35,16 @@ class Streamer {
     private final String fileName;
     private final boolean attachment;
     private final HttpServletRequest request;
-    private final HttpServletResponse response;
+    private final WebResponse response;
     private final boolean writeBody;
 
     public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
-                    HttpServletRequest request, HttpServletResponse response) {
+                    HttpServletRequest request, WebResponse response) {
         this(length, inputStream, fileName, attachment, request, response, true);
     }
 
     public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
-                    HttpServletRequest request, HttpServletResponse response, boolean writeBody) {
+                    HttpServletRequest request, WebResponse response, boolean writeBody) {
         this.length = length;
         this.inputStream = inputStream;
         this.fileName = fileName;
@@ -65,7 +65,7 @@ class Streamer {
         if (range.unsatisfiable) {
             response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
             response.setHeader("Content-Range", "bytes */" + length);
-            response.setContentLengthLong(0);
+            response.setContentLength(0);
             closeInputStream();
             return 0;
         } else if (range.partial) {
@@ -78,10 +78,7 @@ class Streamer {
             response.setStatus(HttpServletResponse.SC_OK);
         }
 
-        //let container do it via setContentLengthLong
-        //response.setHeader("Content-Length", "" + contentLength);
-
-        response.setContentLengthLong(contentLength);
+        response.setContentLength(contentLength);
 
 
         if (!attachment) {
@@ -104,7 +101,6 @@ class Streamer {
 
             final int bufferSize = (int) Math.min(BUFFER_SIZE, Math.max(1L, contentLength));
             final byte[] buf = new byte[bufferSize];
-            final OutputStream out = response.getOutputStream();
             long left = contentLength;
             while (left > 0) {
                 int howMuch = bufferSize;
@@ -121,11 +117,12 @@ class Streamer {
                     if (singleByte == -1) {
                         throw new EOFException("Resource stream ended with " + left + " bytes left to write");
                     }
-                    out.write(singleByte);
+                    buf[0] = (byte) singleByte;
+                    response.write(buf, 0, 1);
                     left--;
                     written++;
                 } else {
-                    out.write(buf, 0, numRead);
+                    response.write(buf, 0, numRead);
                     left -= numRead;
                     written += numRead;
                 }

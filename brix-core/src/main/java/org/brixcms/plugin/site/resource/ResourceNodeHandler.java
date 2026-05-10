@@ -74,8 +74,7 @@ public class ResourceNodeHandler implements IRequestHandler {
 			throw Brix.get().getForbiddenException();
 		}
 
-		HttpServletResponse httpServletResponse = (HttpServletResponse) ((WebResponse) requestCycle.getResponse())
-				.getContainerResponse();
+		WebResponse response = (WebResponse) requestCycle.getResponse();
 
 		try {
 			final HttpServletRequest r = (HttpServletRequest) requestCycle.getRequest().getContainerRequest();
@@ -87,14 +86,14 @@ public class ResourceNodeHandler implements IRequestHandler {
 			}
 			String etag = createWeakETag(node, lastModified, contentLength);
 
-			httpServletResponse.setContentType(mimeType);
-			httpServletResponse.setHeader("ETag", etag);
+			response.setContentType(mimeType);
+			response.setHeader("ETag", etag);
 			if (lastModified != null) {
-				httpServletResponse.setDateHeader("Last-Modified", lastModified.getTime());
+				response.setDateHeader("Last-Modified", lastModified.toInstant());
 			}
 
 			if (!save && isNotModified(r, lastModified, etag)) {
-				httpServletResponse.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+				response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
 				return;
 			}
 
@@ -102,18 +101,16 @@ public class ResourceNodeHandler implements IRequestHandler {
 			boolean writeBody = !"HEAD".equalsIgnoreCase(r.getMethod());
 			InputStream stream = writeBody ? node.getDataAsStream() : InputStream.nullInputStream();
 
-			new Streamer(contentLength, stream, fileName, save, r, httpServletResponse, writeBody).stream();
+			new Streamer(contentLength, stream, fileName, save, r, response, writeBody).stream();
 		} catch (Exception e) {
 			if (isClientAbort(e)) {
 				log.debug("Client aborted while streaming resource (ignored): {}", rootMessage(e));
 			} else {
 				log.error("Error writing resource data to content", e);
-				if (!httpServletResponse.isCommitted()) {
-					try {
-						httpServletResponse.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-					} catch (Exception sendErrorException) {
-						log.debug("Unable to send resource error response", sendErrorException);
-					}
+				try {
+					response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error writing resource data");
+				} catch (Exception sendErrorException) {
+					log.debug("Unable to send resource error response", sendErrorException);
 				}
 			}
 		}

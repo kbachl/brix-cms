@@ -13,14 +13,15 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
-import jakarta.servlet.ServletOutputStream;
-import jakarta.servlet.WriteListener;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.apache.wicket.request.http.WebResponse;
 import org.junit.Test;
 
 public class StreamerTest {
@@ -30,7 +31,7 @@ public class StreamerTest {
         CapturingResponse response = new CapturingResponse();
 
         long written = new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
-                request("bytes=-100"), response.asHttpServletResponse()).stream();
+                request("bytes=-100"), response).stream();
 
         assertEquals(HttpServletResponse.SC_PARTIAL_CONTENT, response.status);
         assertEquals("bytes 0-5/6", response.headers.get("Content-Range"));
@@ -46,7 +47,7 @@ public class StreamerTest {
         CapturingResponse response = new CapturingResponse();
 
         new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
-                request("bytes=2-99"), response.asHttpServletResponse()).stream();
+                request("bytes=2-99"), response).stream();
 
         assertEquals(HttpServletResponse.SC_PARTIAL_CONTENT, response.status);
         assertEquals("bytes 2-5/6", response.headers.get("Content-Range"));
@@ -60,7 +61,7 @@ public class StreamerTest {
         CapturingResponse response = new CapturingResponse();
 
         new Streamer(data.length, new SlowSkipInputStream(data), "asset.txt", false,
-                request("bytes=4-7"), response.asHttpServletResponse()).stream();
+                request("bytes=4-7"), response).stream();
 
         assertEquals(HttpServletResponse.SC_PARTIAL_CONTENT, response.status);
         assertEquals("bytes 4-7/10", response.headers.get("Content-Range"));
@@ -74,7 +75,7 @@ public class StreamerTest {
         CapturingResponse response = new CapturingResponse();
 
         new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
-                request("bytes=99-100"), response.asHttpServletResponse()).stream();
+                request("bytes=99-100"), response).stream();
 
         assertEquals(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE, response.status);
         assertEquals("bytes */6", response.headers.get("Content-Range"));
@@ -89,7 +90,7 @@ public class StreamerTest {
         CapturingResponse response = new CapturingResponse();
 
         long written = new Streamer(data.length, stream, "asset.txt", false,
-                request(null), response.asHttpServletResponse(), false).stream();
+                request(null), response, false).stream();
 
         assertEquals(HttpServletResponse.SC_OK, response.status);
         assertEquals(data.length, response.contentLength);
@@ -106,7 +107,7 @@ public class StreamerTest {
 
         try {
             new Streamer(data.length + 2, new ByteArrayInputStream(data), "asset.txt", false,
-                    request(null), response.asHttpServletResponse()).stream();
+                    request(null), response).stream();
         } catch (RuntimeException e) {
             assertTrue(rootCause(e) instanceof EOFException);
             return;
@@ -151,55 +152,103 @@ public class StreamerTest {
         return 0;
     }
 
-    private static class CapturingResponse {
+    private static class CapturingResponse extends WebResponse {
         private int status;
         private long contentLength = -1;
         private boolean flushed;
         private final Map<String, String> headers = new HashMap<String, String>();
         private final ByteArrayOutputStream body = new ByteArrayOutputStream();
 
-        private HttpServletResponse asHttpServletResponse() {
-            InvocationHandler handler = (Object proxy, Method method, Object[] args) -> {
-                switch (method.getName()) {
-                    case "setStatus":
-                        status = (Integer) args[0];
-                        return null;
-                    case "setHeader":
-                        headers.put((String) args[0], (String) args[1]);
-                        return null;
-                    case "setContentLengthLong":
-                        contentLength = (Long) args[0];
-                        return null;
-                    case "getOutputStream":
-                        return new ServletOutputStream() {
-                            @Override
-                            public boolean isReady() {
-                                return true;
-                            }
+        @Override
+        public void addCookie(Cookie cookie) {
+        }
 
-                            @Override
-                            public void setWriteListener(WriteListener writeListener) {
-                            }
+        @Override
+        public void clearCookie(Cookie cookie) {
+        }
 
-                            @Override
-                            public void write(int b) {
-                                body.write(b);
-                            }
+        @Override
+        public boolean isHeaderSupported() {
+            return true;
+        }
 
-                            @Override
-                            public void write(byte[] b, int off, int len) {
-                                body.write(b, off, len);
-                            }
-                        };
-                    case "flushBuffer":
-                        flushed = true;
-                        return null;
-                    default:
-                        return defaultValue(method.getReturnType());
-                }
-            };
-            return (HttpServletResponse) Proxy.newProxyInstance(StreamerTest.class.getClassLoader(),
-                    new Class<?>[] { HttpServletResponse.class }, handler);
+        @Override
+        public void setHeader(String name, String value) {
+            headers.put(name, value);
+        }
+
+        @Override
+        public void addHeader(String name, String value) {
+            headers.put(name, value);
+        }
+
+        @Override
+        public void setDateHeader(String name, Instant date) {
+            headers.put(name, date.toString());
+        }
+
+        @Override
+        public void setContentLength(long length) {
+            contentLength = length;
+        }
+
+        @Override
+        public void setContentType(String mimeType) {
+            headers.put("Content-Type", mimeType);
+        }
+
+        @Override
+        public void setStatus(int status) {
+            this.status = status;
+        }
+
+        @Override
+        public void sendError(int status, String message) {
+            this.status = status;
+        }
+
+        @Override
+        public String encodeRedirectURL(CharSequence url) {
+            return url.toString();
+        }
+
+        @Override
+        public void sendRedirect(String url) {
+        }
+
+        @Override
+        public boolean isRedirect() {
+            return false;
+        }
+
+        @Override
+        public void flush() {
+            flushed = true;
+        }
+
+        @Override
+        public void write(CharSequence sequence) {
+            body.writeBytes(sequence.toString().getBytes(StandardCharsets.UTF_8));
+        }
+
+        @Override
+        public void write(byte[] array) {
+            body.write(array, 0, array.length);
+        }
+
+        @Override
+        public void write(byte[] array, int offset, int length) {
+            body.write(array, offset, length);
+        }
+
+        @Override
+        public String encodeURL(CharSequence url) {
+            return url.toString();
+        }
+
+        @Override
+        public Object getContainerResponse() {
+            return null;
         }
     }
 

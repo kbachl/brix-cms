@@ -74,8 +74,8 @@ public class ResourceNodeHandler implements IRequestHandler {
 			throw Brix.get().getForbiddenException();
 		}
 
-		WebResponse response = (WebResponse) requestCycle.getResponse();
-		HttpServletResponse httpServletResponse = (HttpServletResponse) response.getContainerResponse();
+		HttpServletResponse httpServletResponse = (HttpServletResponse) ((WebResponse) requestCycle.getResponse())
+				.getContainerResponse();
 
 		try {
 			final HttpServletRequest r = (HttpServletRequest) requestCycle.getRequest().getContainerRequest();
@@ -87,16 +87,13 @@ public class ResourceNodeHandler implements IRequestHandler {
 			}
 			String etag = createWeakETag(node, lastModified, contentLength);
 
-			response.setContentType(mimeType);
 			httpServletResponse.setContentType(mimeType);
 			httpServletResponse.setHeader("ETag", etag);
 			if (lastModified != null) {
-				response.setLastModifiedTime(lastModified.toInstant());
 				httpServletResponse.setDateHeader("Last-Modified", lastModified.getTime());
 			}
 
 			if (!save && isNotModified(r, lastModified, etag)) {
-				response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
 				httpServletResponse.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
 				return;
 			}

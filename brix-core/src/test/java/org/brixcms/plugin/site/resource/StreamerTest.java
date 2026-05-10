@@ -2,6 +2,7 @@ package org.brixcms.plugin.site.resource;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -28,13 +29,15 @@ public class StreamerTest {
         byte[] data = bytes("abcdef");
         CapturingResponse response = new CapturingResponse();
 
-        new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
+        long written = new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
                 request("bytes=-100"), response.asHttpServletResponse()).stream();
 
         assertEquals(HttpServletResponse.SC_PARTIAL_CONTENT, response.status);
         assertEquals("bytes 0-5/6", response.headers.get("Content-Range"));
         assertEquals(6, response.contentLength);
+        assertEquals(6, written);
         assertArrayEquals(data, response.body.toByteArray());
+        assertFalse(response.flushed);
     }
 
     @Test
@@ -77,6 +80,23 @@ public class StreamerTest {
         assertEquals("bytes */6", response.headers.get("Content-Range"));
         assertEquals(0, response.contentLength);
         assertEquals(0, response.body.size());
+    }
+
+    @Test
+    public void suppressedBodySetsHeadersAndClosesSourceStream() {
+        byte[] data = bytes("abcdef");
+        CloseTrackingInputStream stream = new CloseTrackingInputStream(data);
+        CapturingResponse response = new CapturingResponse();
+
+        long written = new Streamer(data.length, stream, "asset.txt", false,
+                request(null), response.asHttpServletResponse(), false).stream();
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertEquals(data.length, response.contentLength);
+        assertEquals(0, written);
+        assertEquals(0, response.body.size());
+        assertTrue(stream.closed);
+        assertFalse(response.flushed);
     }
 
     @Test
@@ -134,6 +154,7 @@ public class StreamerTest {
     private static class CapturingResponse {
         private int status;
         private long contentLength = -1;
+        private boolean flushed;
         private final Map<String, String> headers = new HashMap<String, String>();
         private final ByteArrayOutputStream body = new ByteArrayOutputStream();
 
@@ -171,6 +192,7 @@ public class StreamerTest {
                             }
                         };
                     case "flushBuffer":
+                        flushed = true;
                         return null;
                     default:
                         return defaultValue(method.getReturnType());
@@ -189,6 +211,20 @@ public class StreamerTest {
         @Override
         public synchronized long skip(long n) {
             return super.skip(Math.min(n, 1));
+        }
+    }
+
+    private static class CloseTrackingInputStream extends ByteArrayInputStream {
+        private boolean closed;
+
+        private CloseTrackingInputStream(byte[] data) {
+            super(data);
+        }
+
+        @Override
+        public void close() throws IOException {
+            closed = true;
+            super.close();
         }
     }
 

@@ -14,9 +14,8 @@
 
 package org.brixcms.plugin.site.resource;
 
-import org.apache.wicket.request.cycle.RequestCycle;
-import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.lang.Bytes;
+
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedInputStream;
@@ -37,20 +36,27 @@ class Streamer {
     private final boolean attachment;
     private final HttpServletRequest request;
     private final HttpServletResponse response;
+    private final boolean writeBody;
 
     public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
                     HttpServletRequest request, HttpServletResponse response) {
+        this(length, inputStream, fileName, attachment, request, response, true);
+    }
+
+    public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
+                    HttpServletRequest request, HttpServletResponse response, boolean writeBody) {
         this.length = length;
         this.inputStream = inputStream;
         this.fileName = fileName;
         this.response = response;
         this.request = request;
         this.attachment = attachment;
+        this.writeBody = writeBody;
     }
 
     private static final int BUFFER_SIZE = (int) Bytes.kilobytes(64).bytes();
 
-    public void stream() {
+    public long stream() {
         Range range = parseRange(request.getHeader("Range"), length);
         long first = 0;
         long last = length - 1;
@@ -61,7 +67,7 @@ class Streamer {
             response.setHeader("Content-Range", "bytes */" + length);
             response.setContentLengthLong(0);
             closeInputStream();
-            return;
+            return 0;
         } else if (range.partial) {
             first = range.start;
             last = range.end;
@@ -86,33 +92,14 @@ class Streamer {
         response.setHeader("Accept-Ranges", "bytes");
 
 
-        /**
-         * we ignore this part now and let the container decide!
-         */
-//        /**
-//         * should request be kept alive?
-//         */
-//        String keepAlive = request.getHeader("Connection");
-//        if(keepAlive != null && keepAlive.equalsIgnoreCase("keep-alive")) {
-//            response.setHeader("Connection", "keep-alive");
-//        } else {
-//            response.setHeader("Connection", "close");
-//        }
+        if (!writeBody) {
+            closeInputStream();
+            return 0;
+        }
 
-        InputStream s = null;
+        long written = 0;
 
-        try {
-            // Wir prüfen, ob wir in einem Wicket-Request sind
-            if (RequestCycle.get() != null && RequestCycle.get().getResponse() instanceof WebResponse) {
-                // Jetzt zwingen wir Wicket, seine gepufferten Header loszuwerden.
-                // Da der Streamer seine Header (oben) schon gesetzt hat, ist das jetzt sicher.
-                ((WebResponse) RequestCycle.get().getResponse()).flush();
-            }
-            // flush headers - this is expected to be required for some versions of Firefox
-            response.flushBuffer();
-
-            s = new BufferedInputStream(inputStream);
-
+        try (InputStream s = new BufferedInputStream(inputStream)) {
             skipFully(s, first);
 
             final int bufferSize = (int) Math.min(BUFFER_SIZE, Math.max(1L, contentLength));
@@ -136,25 +123,18 @@ class Streamer {
                     }
                     out.write(singleByte);
                     left--;
+                    written++;
                 } else {
                     out.write(buf, 0, numRead);
                     left -= numRead;
+                    written += numRead;
                 }
             }
         } catch (Exception e) {
-            if (e.getClass().getName().contains("Eof")) {
-                // ignore
-            } else {
-                throw new RuntimeException(e);
-            }
-        } finally {
-            if (s != null) {
-                try {
-                    s.close();
-                } catch (IOException ignore) {
-                }
-            }
+            throw new RuntimeException(e);
         }
+
+        return written;
     }
 
     private void closeInputStream() {

@@ -30,6 +30,7 @@ import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.string.Strings;
 import org.brixcms.Brix;
 import org.brixcms.auth.Action;
+import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.wrapper.BrixFileNode;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.SitePlugin;
@@ -69,56 +70,124 @@ public class ResourceNodeHandler implements IRequestHandler {
 				.getParameterValue(SAVE_PARAMETER).toString());
 
 		BrixFileNode node = (BrixFileNode) this.node.getObject();
-		String mimeType = node.getMimeType();
-		Date lastModified = node.getLastModified();
-		long contentLength = node.getContentLength();
-
 		if (!SitePlugin.get().canViewNode(node, Action.Context.PRESENTATION)) {
 			throw Brix.get().getForbiddenException();
 		}
 
 		WebResponse response = (WebResponse) requestCycle.getResponse();
-
-		response.setContentType(mimeType);
-
-		response.setLastModifiedTime(lastModified.toInstant());
+		HttpServletResponse httpServletResponse = (HttpServletResponse) response.getContainerResponse();
 
 		try {
 			final HttpServletRequest r = (HttpServletRequest) requestCycle.getRequest().getContainerRequest();
-			String since = r.getHeader("If-Modified-Since");
-			if (!save && since != null) {
-				try {
-					// Hier try-catch, damit wir bei Fehler weitermachen können
-					long dateHeader = r.getDateHeader("If-Modified-Since");
-
-					if (dateHeader != -1) {
-						Date d = new Date(dateHeader);
-						// the weird toString comparison is to prevent comparing milliseconds
-						if (d.after(lastModified) || d.toString().equals(lastModified.toString())) {
-							response.setContentLength(contentLength);
-							response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
-							return;
-						}
-					}
-				} catch (IllegalArgumentException ignored) {
-					// Header war Schrott (z.B. "+0000"). Wir ignorieren das Caching
-					// und liefern die Datei einfach ganz normal aus.
-					// Optional: log.debug("Invalid If-Modified-Since header received: {}", since);
-				}
+			String mimeType = resolveMimeType(node);
+			Date lastModified = resolveLastModified(node);
+			long contentLength = node.getContentLength();
+			if (contentLength < 0) {
+				throw new IllegalStateException("Resource content length is negative for " + node.getPath());
 			}
-			String fileName = node.getName();
-			HttpServletResponse httpServletResponse = (HttpServletResponse) response.getContainerResponse();
-			httpServletResponse.setContentType(mimeType);
-			httpServletResponse.setDateHeader("Last-Modified", lastModified.getTime());
-			InputStream stream = node.getDataAsStream();
+			String etag = createWeakETag(node, lastModified, contentLength);
 
-			new Streamer(contentLength, stream, fileName, save, r, httpServletResponse).stream();
+			response.setContentType(mimeType);
+			httpServletResponse.setContentType(mimeType);
+			httpServletResponse.setHeader("ETag", etag);
+			if (lastModified != null) {
+				response.setLastModifiedTime(lastModified.toInstant());
+				httpServletResponse.setDateHeader("Last-Modified", lastModified.getTime());
+			}
+
+			if (!save && isNotModified(r, lastModified, etag)) {
+				response.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+				httpServletResponse.setStatus(HttpServletResponse.SC_NOT_MODIFIED);
+				return;
+			}
+
+			String fileName = node.getName();
+			boolean writeBody = !"HEAD".equalsIgnoreCase(r.getMethod());
+			InputStream stream = writeBody ? node.getDataAsStream() : InputStream.nullInputStream();
+
+			new Streamer(contentLength, stream, fileName, save, r, httpServletResponse, writeBody).stream();
 		} catch (Exception e) {
 			if (isClientAbort(e)) {
 				log.debug("Client aborted while streaming resource (ignored): {}", rootMessage(e));
 			} else {
 				log.error("Error writing resource data to content", e);
+				if (!httpServletResponse.isCommitted()) {
+					try {
+						httpServletResponse.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+					} catch (Exception sendErrorException) {
+						log.debug("Unable to send resource error response", sendErrorException);
+					}
+				}
 			}
+		}
+	}
+
+	private static String resolveMimeType(BrixFileNode node) {
+		String mimeType = null;
+		try {
+			mimeType = node.getMimeType();
+		} catch (Exception e) {
+			log.debug("Unable to read resource MIME type, falling back to file extension for {}", node.getPath(), e);
+		}
+		if (Strings.isEmpty(mimeType)) {
+			ResourceNodePlugin plugin = (ResourceNodePlugin) SitePlugin.get(node.getBrix())
+					.getNodePluginForType(ResourceNodePlugin.TYPE);
+			mimeType = plugin.resolveMimeTypeFromFileName(node.getName());
+		}
+		return Strings.isEmpty(mimeType) ? "application/octet-stream" : mimeType;
+	}
+
+	private static Date resolveLastModified(BrixFileNode node) {
+		Date lastModified = node.getLastModified();
+		if (lastModified != null) {
+			return lastModified;
+		}
+		if (node.hasNode("jcr:content")) {
+			try {
+				JcrNode content = node.getNode("jcr:content");
+				if (content.hasProperty("jcr:lastModified")) {
+					return content.getProperty("jcr:lastModified").getDate().getTime();
+				}
+			} catch (Exception e) {
+				log.debug("Unable to read jcr:lastModified fallback for {}", node.getPath(), e);
+			}
+		}
+		return null;
+	}
+
+	private static String createWeakETag(BrixFileNode node, Date lastModified, long contentLength) {
+		long lastModifiedTime = lastModified != null ? lastModified.getTime() : -1L;
+		return "W/\"" + Integer.toHexString(node.getPath().hashCode()) + "-" +
+				Long.toHexString(lastModifiedTime) + "-" + Long.toHexString(contentLength) + "\"";
+	}
+
+	private static boolean isNotModified(HttpServletRequest request, Date lastModified, String etag) {
+		String ifNoneMatch = request.getHeader("If-None-Match");
+		if (!Strings.isEmpty(ifNoneMatch)) {
+			return matchesETag(ifNoneMatch, etag);
+		}
+		return isNotModifiedSince(request, lastModified);
+	}
+
+	private static boolean matchesETag(String header, String etag) {
+		for (String candidate : header.split(",")) {
+			String trimmed = candidate.trim();
+			if ("*".equals(trimmed) || etag.equals(trimmed)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static boolean isNotModifiedSince(HttpServletRequest request, Date lastModified) {
+		if (lastModified == null || request.getHeader("If-Modified-Since") == null) {
+			return false;
+		}
+		try {
+			long dateHeader = request.getDateHeader("If-Modified-Since");
+			return dateHeader != -1 && lastModified.getTime() / 1000 <= dateHeader / 1000;
+		} catch (IllegalArgumentException ignored) {
+			return false;
 		}
 	}
 

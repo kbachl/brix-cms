@@ -58,8 +58,8 @@
 		<deployment.disabled>false</deployment.disabled>
 		<sources.disabled>false</sources.disabled>
 
-		<wicket.version>10.8.0</wicket.version>
-		<inmethod.grid.version>10.7.0</inmethod.grid.version>
+		<wicket.version>10.9.0</wicket.version>
+		<inmethod.grid.version>10.8.0</inmethod.grid.version>
 		<jetty.version>11.0.26</jetty.version>
 		<htmllexer.version>2.1</htmllexer.version>
 		<jackrabbit.version>2.22.2</jackrabbit.version>

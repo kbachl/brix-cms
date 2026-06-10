@@ -16,6 +16,7 @@ package org.brixcms.jcr.wrapper;
 
 import org.apache.wicket.util.io.Streams;
 import org.apache.wicket.util.string.Strings;
+import org.brixcms.Brix;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.plugin.site.SitePlugin;
@@ -28,7 +29,11 @@ import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.security.DigestInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Calendar;
+import java.util.HexFormat;
 
 /**
  * Base class for nodes with content (with JCR primary type nt:file).
@@ -37,6 +42,8 @@ import java.util.Calendar;
  * @see #initialize(JcrNode, String)
  */
 public class BrixFileNode extends BrixNode {
+    private static final String JCR_PROP_CONTENT_SHA256 = Brix.NS_PREFIX + "contentSha256";
+
     /**
      * Returns if the node is a file node,
      *
@@ -134,6 +141,53 @@ public class BrixFileNode extends BrixNode {
         return getContent().getProperty("jcr:data").getLength();
     }
 
+    public String getContentSha256() {
+        if (hasProperty(JCR_PROP_CONTENT_SHA256)) {
+            String hash = getProperty(JCR_PROP_CONTENT_SHA256).getString();
+            if (!Strings.isEmpty(hash)) {
+                return hash;
+            }
+        }
+        return null;
+    }
+
+    public String ensureContentSha256() {
+        String hash = getContentSha256();
+        if (hash != null) {
+            return hash;
+        }
+        hash = calculateContentSha256();
+        setContentSha256(hash);
+        saveHashBestEffort();
+        return hash;
+    }
+
+    public String calculateContentSha256() {
+        try (InputStream data = getDataAsStream()) {
+            return sha256Hex(data);
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to calculate content hash for " + getPath(), e);
+        }
+    }
+
+    private void updateContentSha256() {
+        setContentSha256(calculateContentSha256());
+    }
+
+    private void setContentSha256(String hash) {
+        if (!Strings.isEmpty(hash)) {
+            setProperty(JCR_PROP_CONTENT_SHA256, hash);
+        }
+    }
+
+    private void saveHashBestEffort() {
+        try {
+            save();
+        } catch (RuntimeException e) {
+            // Hashing is still valid for this response. Persistence is only an optimization for existing resources.
+        }
+    }
+
     /**
      * Returns the data of this node as string
      *
@@ -179,6 +233,7 @@ public class BrixFileNode extends BrixNode {
      */
     public void setData(Binary data) {
         getContent().setProperty("jcr:data", data);
+        updateContentSha256();
     }
 
     /**
@@ -201,6 +256,7 @@ public class BrixFileNode extends BrixNode {
         }
         setEncoding("UTF-8");
         getContent().setProperty("jcr:data", data);
+        updateContentSha256();
     }
 
     /**
@@ -245,6 +301,22 @@ public class BrixFileNode extends BrixNode {
         }
         catch (RepositoryException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    static String sha256Hex(InputStream stream) throws IOException {
+        MessageDigest digest = sha256Digest();
+        try (DigestInputStream digestStream = new DigestInputStream(stream, digest)) {
+            Streams.copy(digestStream, OutputStream.nullOutputStream());
+        }
+        return HexFormat.of().formatHex(digest.digest());
+    }
+
+    private static MessageDigest sha256Digest() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
         }
     }
 }

@@ -65,7 +65,7 @@ class Streamer {
         if (range.unsatisfiable) {
             response.setStatus(HttpServletResponse.SC_REQUESTED_RANGE_NOT_SATISFIABLE);
             response.setHeader("Content-Range", "bytes */" + length);
-            response.setContentLength(0);
+            setResponseContentLength(0);
             closeInputStream();
             return 0;
         } else if (range.partial) {
@@ -78,7 +78,7 @@ class Streamer {
             response.setStatus(HttpServletResponse.SC_OK);
         }
 
-        response.setContentLength(contentLength);
+        setResponseContentLength(contentLength);
 
 
         if (!attachment) {
@@ -132,6 +132,15 @@ class Streamer {
         }
 
         return written;
+    }
+
+    private void setResponseContentLength(long contentLength) {
+        Object containerResponse = response.getContainerResponse();
+        if (containerResponse instanceof HttpServletResponse httpServletResponse) {
+            httpServletResponse.setContentLengthLong(contentLength);
+        } else {
+            response.setContentLength(contentLength);
+        }
     }
 
     private void closeInputStream() {

@@ -84,10 +84,12 @@ public class ResourceNodeHandler implements IRequestHandler {
 			if (contentLength < 0) {
 				throw new IllegalStateException("Resource content length is negative for " + node.getPath());
 			}
-			String etag = createWeakETag(node, lastModified, contentLength);
+			String etag = createContentETag(resolveContentHash(node));
 
 			response.setContentType(mimeType);
-			response.setHeader("ETag", etag);
+			if (etag != null) {
+				response.setHeader("ETag", etag);
+			}
 			if (lastModified != null) {
 				response.setDateHeader("Last-Modified", lastModified.toInstant());
 			}
@@ -149,28 +151,48 @@ public class ResourceNodeHandler implements IRequestHandler {
 		return null;
 	}
 
-	private static String createWeakETag(BrixFileNode node, Date lastModified, long contentLength) {
-		long lastModifiedTime = lastModified != null ? lastModified.getTime() : -1L;
-		return "W/\"" + Integer.toHexString(node.getPath().hashCode()) + "-" +
-				Long.toHexString(lastModifiedTime) + "-" + Long.toHexString(contentLength) + "\"";
+	private static String resolveContentHash(BrixFileNode node) {
+		try {
+			return node.ensureContentSha256();
+		} catch (RuntimeException e) {
+			log.warn("Unable to calculate resource content hash for {}", node.getPath(), e);
+			return null;
+		}
 	}
 
-	private static boolean isNotModified(HttpServletRequest request, Date lastModified, String etag) {
+	static String createContentETag(String contentSha256) {
+		if (Strings.isEmpty(contentSha256)) {
+			return null;
+		}
+		return "W/\"sha256-" + contentSha256 + "\"";
+	}
+
+	static boolean isNotModified(HttpServletRequest request, Date lastModified, String etag) {
 		String ifNoneMatch = request.getHeader("If-None-Match");
 		if (!Strings.isEmpty(ifNoneMatch)) {
 			return matchesETag(ifNoneMatch, etag);
 		}
+		if (etag != null) {
+			return false;
+		}
 		return isNotModifiedSince(request, lastModified);
 	}
 
-	private static boolean matchesETag(String header, String etag) {
+	static boolean matchesETag(String header, String etag) {
+		if (Strings.isEmpty(etag)) {
+			return false;
+		}
 		for (String candidate : header.split(",")) {
 			String trimmed = candidate.trim();
-			if ("*".equals(trimmed) || etag.equals(trimmed)) {
+			if ("*".equals(trimmed) || etag.equals(trimmed) || stripWeakPrefix(etag).equals(stripWeakPrefix(trimmed))) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	private static String stripWeakPrefix(String etag) {
+		return etag != null && etag.startsWith("W/") ? etag.substring(2) : etag;
 	}
 
 	private static boolean isNotModifiedSince(HttpServletRequest request, Date lastModified) {

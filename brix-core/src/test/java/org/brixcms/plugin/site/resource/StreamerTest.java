@@ -101,6 +101,21 @@ public class StreamerTest {
     }
 
     @Test
+    public void servletResponseUsesNativeContentLengthLong() {
+        byte[] data = bytes("abcdef");
+        ServletLengthCapture servlet = new ServletLengthCapture();
+        CapturingResponse response = new CapturingResponse(servlet.response());
+
+        long written = new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
+                request(null), response, false).stream();
+
+        assertEquals(data.length, servlet.contentLengthLong);
+        assertEquals(-1, response.contentLength);
+        assertEquals(0, servlet.contentLengthHeaderAdds);
+        assertEquals(0, written);
+    }
+
+    @Test
     public void unexpectedEndOfSourceStreamIsNotSilentlyIgnored() {
         byte[] data = bytes("abc");
         CapturingResponse response = new CapturingResponse();
@@ -149,6 +164,9 @@ public class StreamerTest {
         if (type == Character.TYPE) {
             return '\0';
         }
+        if (type == Void.TYPE) {
+            return null;
+        }
         return 0;
     }
 
@@ -156,8 +174,17 @@ public class StreamerTest {
         private int status;
         private long contentLength = -1;
         private boolean flushed;
+        private final Object containerResponse;
         private final Map<String, String> headers = new HashMap<String, String>();
         private final ByteArrayOutputStream body = new ByteArrayOutputStream();
+
+        private CapturingResponse() {
+            this(null);
+        }
+
+        private CapturingResponse(Object containerResponse) {
+            this.containerResponse = containerResponse;
+        }
 
         @Override
         public void addCookie(Cookie cookie) {
@@ -248,7 +275,31 @@ public class StreamerTest {
 
         @Override
         public Object getContainerResponse() {
-            return null;
+            return containerResponse;
+        }
+    }
+
+    private static class ServletLengthCapture implements InvocationHandler {
+        private long contentLengthLong = -1;
+        private int contentLengthHeaderAdds;
+
+        private HttpServletResponse response() {
+            return (HttpServletResponse) Proxy.newProxyInstance(StreamerTest.class.getClassLoader(),
+                    new Class<?>[] { HttpServletResponse.class }, this);
+        }
+
+        @Override
+        public Object invoke(Object proxy, Method method, Object[] args) {
+            if ("setContentLengthLong".equals(method.getName())) {
+                contentLengthLong = (Long) args[0];
+                return null;
+            }
+            if ("addHeader".equals(method.getName()) && args != null && args.length == 2 &&
+                    "Content-Length".equals(args[0])) {
+                contentLengthHeaderAdds++;
+                return null;
+            }
+            return defaultValue(method.getReturnType());
         }
     }
 

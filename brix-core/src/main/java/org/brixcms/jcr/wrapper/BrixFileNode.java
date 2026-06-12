@@ -176,6 +176,9 @@ public class BrixFileNode extends BrixNode {
 
     private void setContentSha256(String hash) {
         if (!Strings.isEmpty(hash)) {
+            if (!isNodeType(JCR_TYPE_BRIX_NODE)) {
+                addMixin(JCR_TYPE_BRIX_NODE);
+            }
             setProperty(JCR_PROP_CONTENT_SHA256, hash);
         }
     }

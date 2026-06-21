@@ -168,12 +168,12 @@ public class ResourceNodeHandler implements IRequestHandler {
 	}
 
 	static boolean isNotModified(HttpServletRequest request, Date lastModified, String etag) {
+		// Per RFC 7232 the If-None-Match validator takes precedence. Only when the client did not
+		// send If-None-Match do we fall back to If-Modified-Since - the presence of a server-side
+		// ETag must not disable date-based conditional requests for clients that rely on them.
 		String ifNoneMatch = request.getHeader("If-None-Match");
 		if (!Strings.isEmpty(ifNoneMatch)) {
 			return matchesETag(ifNoneMatch, etag);
-		}
-		if (etag != null) {
-			return false;
 		}
 		return isNotModifiedSince(request, lastModified);
 	}

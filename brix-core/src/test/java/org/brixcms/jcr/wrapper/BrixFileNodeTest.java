@@ -105,6 +105,34 @@ public class BrixFileNodeTest {
                 file.getContentSha256());
     }
 
+    @Test
+    public void staleHashIsRecomputedWhenContentChangesOutsideSetData() throws IOException, RepositoryException {
+        // Simulates a content change that bypasses BrixFileNode.setData() (e.g. an XML workspace import):
+        // the persisted hash would otherwise stay stale and serve an incorrect ETag.
+        setupRepository();
+
+        JcrSession session = login();
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+
+        BrixFileNode file = BrixFileNode.initialize(node, "text/css");
+        file.setData("body");
+        root.save();
+
+        String stale = file.getContentSha256();
+
+        // External write directly to jcr:content/jcr:data, no hash update.
+        file.getNode("jcr:content").setProperty("jcr:data", "a completely different body");
+        root.save();
+
+        String recomputed = file.ensureContentSha256();
+
+        assertFalse("hash must change when content changes", stale.equals(recomputed));
+        assertEquals("hash must reflect the current content", file.calculateContentSha256(), recomputed);
+        // After recompute the persisted length matches, so the property now holds the fresh value.
+        assertEquals(recomputed, file.getContentSha256());
+    }
+
     private static void registerBrixNodeTypes(Workspace workspace) throws RepositoryException {
         try {
             workspace.getNamespaceRegistry().registerNamespace(Brix.NS, "http://brix-cms.googlecode.com");

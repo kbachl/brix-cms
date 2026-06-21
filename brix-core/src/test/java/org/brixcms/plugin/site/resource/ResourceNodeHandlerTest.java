@@ -39,14 +39,17 @@ public class ResourceNodeHandlerTest {
     }
 
     @Test
-    public void ifModifiedSinceIsIgnoredWhenContentETagExists() {
+    public void ifModifiedSinceIsHonoredEvenWhenContentETagExists() {
+        // No If-None-Match is sent. Even though the resource carries an ETag, the server must honor
+        // If-Modified-Since for clients that rely on it (RFC 7232 precedence: If-None-Match only
+        // takes precedence when actually present).
         HttpServletRequest request = request(Map.of("If-Modified-Since", "Wed, 10 Jun 2026 12:00:00 GMT"),
                 new Date().getTime());
 
         boolean notModified = ResourceNodeHandler.isNotModified(request, new Date(0),
                 ResourceNodeHandler.createContentETag("abc123"));
 
-        assertFalse(notModified);
+        assertTrue(notModified);
     }
 
     @Test

@@ -21,6 +21,8 @@ import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.plugin.site.SitePlugin;
 import org.brixcms.plugin.site.resource.ResourceNodePlugin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.jcr.Binary;
 import javax.jcr.Node;
@@ -42,7 +44,9 @@ import java.util.HexFormat;
  * @see #initialize(JcrNode, String)
  */
 public class BrixFileNode extends BrixNode {
+    private static final Logger log = LoggerFactory.getLogger(BrixFileNode.class);
     private static final String JCR_PROP_CONTENT_SHA256 = Brix.NS_PREFIX + "contentSha256";
+    private static final String JCR_PROP_CONTENT_SHA256_LENGTH = Brix.NS_PREFIX + "contentSha256Length";
 
     /**
      * Returns if the node is a file node,
@@ -153,13 +157,38 @@ public class BrixFileNode extends BrixNode {
 
     public String ensureContentSha256() {
         String hash = getContentSha256();
-        if (hash != null) {
+        if (hash != null && isPersistedHashForCurrentContent()) {
             return hash;
         }
+        long contentLength = getContentLength();
         hash = calculateContentSha256();
-        setContentSha256(hash);
+        setContentSha256(hash, contentLength);
         saveHashBestEffort();
         return hash;
+    }
+
+    /**
+     * Tells whether the persisted SHA-256 was computed for the content currently stored on this node.
+     * <p>
+     * Content can be replaced through paths that bypass {@link #setData} (for example an XML workspace
+     * import), which would otherwise leave a stale hash and therefore a stale ETag. Re-validating against
+     * the current content length detects such replacements without having to re-hash the binary on every
+     * request.
+     * <p>
+     * Known limitation (accepted trade-off): a replacement that changes the bytes but keeps the exact
+     * same length is not detected. Fully closing that would require re-hashing on every request (cost on
+     * the 304 hot path) or a JCR observation listener (extra complexity). It is out of scope because the
+     * realistic bypass here - whole-workspace XML import - carries a self-consistent jcr:data/hash pair.
+     */
+    private boolean isPersistedHashForCurrentContent() {
+        try {
+            if (!hasProperty(JCR_PROP_CONTENT_SHA256_LENGTH)) {
+                return false;
+            }
+            return getProperty(JCR_PROP_CONTENT_SHA256_LENGTH).getLong() == getContentLength();
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     public String calculateContentSha256() {
@@ -171,15 +200,16 @@ public class BrixFileNode extends BrixNode {
     }
 
     private void updateContentSha256() {
-        setContentSha256(calculateContentSha256());
+        setContentSha256(calculateContentSha256(), getContentLength());
     }
 
-    private void setContentSha256(String hash) {
+    private void setContentSha256(String hash, long contentLength) {
         if (!Strings.isEmpty(hash)) {
             if (!isNodeType(JCR_TYPE_BRIX_NODE)) {
                 addMixin(JCR_TYPE_BRIX_NODE);
             }
             setProperty(JCR_PROP_CONTENT_SHA256, hash);
+            setProperty(JCR_PROP_CONTENT_SHA256_LENGTH, contentLength);
         }
     }
 
@@ -187,7 +217,11 @@ public class BrixFileNode extends BrixNode {
         try {
             save();
         } catch (RuntimeException e) {
-            // Hashing is still valid for this response. Persistence is only an optimization for existing resources.
+            // The computed hash is still valid for this response; persistence only avoids re-hashing the
+            // binary on subsequent requests. Log instead of swallowing silently so a persistently failing
+            // backfill (and the resulting per-request re-hash) stays observable.
+            log.debug("Could not persist content SHA-256 for {} (hash remains valid for this response)",
+                    getPath(), e);
         }
     }
 

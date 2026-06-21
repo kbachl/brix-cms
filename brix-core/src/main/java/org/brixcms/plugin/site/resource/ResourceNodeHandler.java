@@ -78,7 +78,7 @@ public class ResourceNodeHandler implements IRequestHandler {
 
 		try {
 			final HttpServletRequest r = (HttpServletRequest) requestCycle.getRequest().getContainerRequest();
-			String mimeType = resolveMimeType(node);
+			String mimeType = resolveContentType(node);
 			Date lastModified = resolveLastModified(node);
 			long contentLength = node.getContentLength();
 			if (contentLength < 0) {
@@ -144,7 +144,12 @@ public class ResourceNodeHandler implements IRequestHandler {
 		}
 	}
 
-	private static String resolveMimeType(BrixFileNode node) {
+	/**
+	 * Resolves the served {@code Content-Type} for the resource, normalizing it so browsers decode it
+	 * correctly: legacy JavaScript MIME types are mapped to {@code text/javascript} (RFC 9239) and
+	 * text-based types announce their charset (UTF-8 for text content stored by Brix).
+	 */
+	private static String resolveContentType(BrixFileNode node) {
 		String mimeType = null;
 		try {
 			mimeType = node.getMimeType();
@@ -156,7 +161,99 @@ public class ResourceNodeHandler implements IRequestHandler {
 					.getNodePluginForType(ResourceNodePlugin.TYPE);
 			mimeType = plugin.resolveMimeTypeFromFileName(node.getName());
 		}
-		return Strings.isEmpty(mimeType) ? "application/octet-stream" : mimeType;
+		if (Strings.isEmpty(mimeType)) {
+			mimeType = "application/octet-stream";
+		}
+		return normalizeContentType(mimeType, resolveEncoding(node));
+	}
+
+	/**
+	 * Normalizes a raw MIME type into the value to send as {@code Content-Type}.
+	 * <ol>
+	 *     <li>Legacy JavaScript MIME types (e.g. {@code application/javascript},
+	 *         {@code application/x-javascript}, ECMAScript variants) are replaced with the modern
+	 *         standard {@code text/javascript} (RFC 9239). This also fixes already-stored legacy
+	 *         {@code jcr:mimeType} values without requiring a data migration.</li>
+	 *     <li>Text-based types get a {@code charset} parameter when they do not already carry one, so the
+	 *         browser decodes them as UTF-8 instead of guessing a platform default and rendering mojibake.
+	 *         An explicitly declared charset is preserved.</li>
+	 * </ol>
+	 * {@code application/json} is UTF-8 by spec (RFC 8259) and must not carry a charset parameter.
+	 */
+	static String normalizeContentType(String mimeType, String encoding) {
+		if (mimeType == null) {
+			return "application/octet-stream";
+		}
+		String base = baseType(mimeType);
+		if (isLegacyJavaScript(base)) {
+			mimeType = replaceBase(mimeType, "text/javascript");
+			base = "text/javascript";
+		}
+		if (needsCharset(base) && !hasCharsetParam(mimeType)) {
+			String charset = Strings.isEmpty(encoding) ? "UTF-8" : encoding;
+			mimeType = mimeType + "; charset=" + charset;
+		}
+		return mimeType;
+	}
+
+	/**
+	 * Legacy JavaScript MIME types that should be served as the modern {@code text/javascript}
+	 * (RFC 9239). Covers the full deprecated set: the {@code application}/{@code text} variants of
+	 * {@code javascript}/{@code ecmascript} (including the {@code x-} vendor forms), the
+	 * {@code text/{jscript,livescript}} forms, and the versioned {@code *1.x} forms. The canonical
+	 * {@code text/javascript} itself is excluded because it needs no migration.
+	 */
+	private static boolean isLegacyJavaScript(String baseType) {
+		if (baseType.equals("text/javascript")) {
+			return false;
+		}
+		// Versioned forms: text/javascript1.0..1.8 and application/javascript1.0..1.8 (RFC 9239).
+		if (baseType.startsWith("text/javascript1") || baseType.startsWith("application/javascript1")) {
+			return true;
+		}
+		switch (baseType) {
+			case "application/javascript":
+			case "application/x-javascript":
+			case "application/ecmascript":
+			case "application/x-ecmascript":
+			case "text/ecmascript":
+			case "text/x-javascript":
+			case "text/jscript":
+			case "text/livescript":
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	private static boolean needsCharset(String baseType) {
+		return baseType.startsWith("text/") || "application/xml".equals(baseType);
+	}
+
+	private static boolean hasCharsetParam(String mimeType) {
+		return mimeType.toLowerCase().contains("charset");
+	}
+
+	private static String baseType(String mimeType) {
+		int semi = mimeType.indexOf(';');
+		return (semi == -1 ? mimeType : mimeType.substring(0, semi)).trim().toLowerCase();
+	}
+
+	private static String replaceBase(String mimeType, String newBase) {
+		int semi = mimeType.indexOf(';');
+		return semi == -1 ? newBase : newBase + mimeType.substring(semi);
+	}
+
+	private static String resolveEncoding(BrixFileNode node) {
+		try {
+			String encoding = node.getEncoding();
+			if (!Strings.isEmpty(encoding)) {
+				return encoding;
+			}
+		} catch (RuntimeException e) {
+			log.debug("Unable to read resource encoding for {}, defaulting to UTF-8", node.getPath(), e);
+		}
+		return "UTF-8";
 	}
 
 	private static Date resolveLastModified(BrixFileNode node) {

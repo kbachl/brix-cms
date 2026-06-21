@@ -141,6 +141,76 @@ public class ResourceNodeHandlerTest {
                 ResourceNodeHandler.createContentETag("abc123"), null));
     }
 
+    @Test
+    public void legacyJavaScriptMimeIsNormalizedToTextJavascriptWithUtf8Charset() {
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("application/x-javascript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("application/javascript", null));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("application/ecmascript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("application/x-ecmascript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/ecmascript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/x-javascript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/jscript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/livescript", "UTF-8"));
+    }
+
+    @Test
+    public void versionedJavaScriptMimeIsNormalizedToTextJavascript() {
+        // RFC 9239 deprecated versioned forms (text/javascript1.0..1.8 and application/javascript1.x).
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/javascript1.7", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("application/javascript1.2", "UTF-8"));
+    }
+
+    @Test
+    public void standardTextJavascriptGetsCharsetOnly() {
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/javascript", "UTF-8"));
+    }
+
+    @Test
+    public void textCssAndHtmlGetUtf8Charset() {
+        assertEquals("text/css; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/css", "UTF-8"));
+        assertEquals("text/html; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/html", "UTF-8"));
+    }
+
+    @Test
+    public void applicationXmlGetsCharset() {
+        assertEquals("application/xml; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("application/xml", "UTF-8"));
+    }
+
+    @Test
+    public void explicitlyDeclaredCharsetIsPreserved() {
+        assertEquals("text/css; charset=windows-1252",
+                ResourceNodeHandler.normalizeContentType("text/css; charset=windows-1252", "UTF-8"));
+    }
+
+    @Test
+    public void binaryAndJsonTypesGetNoCharset() {
+        assertEquals("image/png", ResourceNodeHandler.normalizeContentType("image/png", "UTF-8"));
+        assertEquals("font/woff2", ResourceNodeHandler.normalizeContentType("font/woff2", "UTF-8"));
+        assertEquals("application/octet-stream",
+                ResourceNodeHandler.normalizeContentType("application/octet-stream", "UTF-8"));
+        assertEquals("application/json",
+                ResourceNodeHandler.normalizeContentType("application/json", "UTF-8"));
+    }
+
+    @Test
+    public void nullMimeTypeFallsBackToOctetStream() {
+        assertEquals("application/octet-stream", ResourceNodeHandler.normalizeContentType(null, "UTF-8"));
+    }
+
     private static HttpServletRequest request(Map<String, String> headers, long dateHeader) {
         Map<String, String> copy = new HashMap<String, String>(headers);
         InvocationHandler handler = (Object proxy, Method method, Object[] args) -> {

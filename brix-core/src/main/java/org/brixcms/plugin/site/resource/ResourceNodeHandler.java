@@ -198,17 +198,19 @@ public class ResourceNodeHandler implements IRequestHandler {
 
 	/**
 	 * Legacy JavaScript MIME types that should be served as the modern {@code text/javascript}
-	 * (RFC 9239). Covers the full deprecated set: the {@code application}/{@code text} variants of
+	 * (RFC 9239). Covers the full deprecated set enumerated by RFC 9239 and the WHATWG MIME Sniffing
+	 * "JavaScript MIME type" group: the {@code application}/{@code text} variants of
 	 * {@code javascript}/{@code ecmascript} (including the {@code x-} vendor forms), the
-	 * {@code text/{jscript,livescript}} forms, and the versioned {@code *1.x} forms. The canonical
-	 * {@code text/javascript} itself is excluded because it needs no migration.
+	 * {@code text/{jscript,livescript}} forms, and the versioned {@code text/javascript1.x} forms.
+	 * The canonical {@code text/javascript} itself is excluded because it needs no migration.
 	 */
 	private static boolean isLegacyJavaScript(String baseType) {
 		if (baseType.equals("text/javascript")) {
 			return false;
 		}
-		// Versioned forms: text/javascript1.0..1.8 and application/javascript1.0..1.8 (RFC 9239).
-		if (baseType.startsWith("text/javascript1") || baseType.startsWith("application/javascript1")) {
+		// Versioned forms live only under the text tree: RFC 9239 enumerates text/javascript1.0..1.5;
+		// some servers also emit higher/suffixed values, which are matched tolerantly here.
+		if (baseType.startsWith("text/javascript1")) {
 			return true;
 		}
 		switch (baseType) {
@@ -217,6 +219,7 @@ public class ResourceNodeHandler implements IRequestHandler {
 			case "application/ecmascript":
 			case "application/x-ecmascript":
 			case "text/ecmascript":
+			case "text/x-ecmascript":
 			case "text/x-javascript":
 			case "text/jscript":
 			case "text/livescript":

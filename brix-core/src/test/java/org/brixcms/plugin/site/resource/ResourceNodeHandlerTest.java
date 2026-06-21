@@ -154,6 +154,8 @@ public class ResourceNodeHandlerTest {
         assertEquals("text/javascript; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("text/ecmascript", "UTF-8"));
         assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/x-ecmascript", "UTF-8"));
+        assertEquals("text/javascript; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("text/x-javascript", "UTF-8"));
         assertEquals("text/javascript; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("text/jscript", "UTF-8"));
@@ -163,11 +165,11 @@ public class ResourceNodeHandlerTest {
 
     @Test
     public void versionedJavaScriptMimeIsNormalizedToTextJavascript() {
-        // RFC 9239 deprecated versioned forms (text/javascript1.0..1.8 and application/javascript1.x).
+        // RFC 9239 deprecated the versioned text/javascript1.x forms (enumerates 1.0..1.5; tolerant of higher).
+        assertEquals("text/javascript; charset=UTF-8",
+                ResourceNodeHandler.normalizeContentType("text/javascript1.5", "UTF-8"));
         assertEquals("text/javascript; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("text/javascript1.7", "UTF-8"));
-        assertEquals("text/javascript; charset=UTF-8",
-                ResourceNodeHandler.normalizeContentType("application/javascript1.2", "UTF-8"));
     }
 
     @Test

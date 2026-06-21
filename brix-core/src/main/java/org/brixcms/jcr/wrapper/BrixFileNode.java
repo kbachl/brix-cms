@@ -77,7 +77,9 @@ public class BrixFileNode extends BrixNode {
         }
         node.addNode("jcr:content", "nt:resource");
         BrixFileNode wrapped = new BrixFileNode(node.getDelegate(), node.getSession());
-        wrapped.setMimeType(mimeType);
+        // Normalize the stored MIME type (e.g. browsers upload .js as application/x-javascript);
+        // legacy JavaScript types become text/javascript (RFC 9239).
+        wrapped.setMimeType(ResourceNodePlugin.normalizeMimeType(mimeType));
         wrapped.getContent().setProperty("jcr:lastModified", Calendar.getInstance());
         wrapped.getContent().setProperty("jcr:data", "");
         return wrapped;

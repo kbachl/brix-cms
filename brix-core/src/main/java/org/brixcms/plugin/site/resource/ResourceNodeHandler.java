@@ -184,8 +184,8 @@ public class ResourceNodeHandler implements IRequestHandler {
 		if (mimeType == null) {
 			return "application/octet-stream";
 		}
-		String base = baseType(mimeType);
-		if (isLegacyJavaScript(base)) {
+		String base = ResourceNodePlugin.baseType(mimeType);
+		if (ResourceNodePlugin.isLegacyJavaScript(base)) {
 			mimeType = replaceBase(mimeType, "text/javascript");
 			base = "text/javascript";
 		}
@@ -196,50 +196,12 @@ public class ResourceNodeHandler implements IRequestHandler {
 		return mimeType;
 	}
 
-	/**
-	 * Legacy JavaScript MIME types that should be served as the modern {@code text/javascript}
-	 * (RFC 9239). Covers the full deprecated set enumerated by RFC 9239 and the WHATWG MIME Sniffing
-	 * "JavaScript MIME type" group: the {@code application}/{@code text} variants of
-	 * {@code javascript}/{@code ecmascript} (including the {@code x-} vendor forms), the
-	 * {@code text/{jscript,livescript}} forms, and the versioned {@code text/javascript1.x} forms.
-	 * The canonical {@code text/javascript} itself is excluded because it needs no migration.
-	 */
-	private static boolean isLegacyJavaScript(String baseType) {
-		if (baseType.equals("text/javascript")) {
-			return false;
-		}
-		// Versioned forms live only under the text tree: RFC 9239 enumerates text/javascript1.0..1.5;
-		// some servers also emit higher/suffixed values, which are matched tolerantly here.
-		if (baseType.startsWith("text/javascript1")) {
-			return true;
-		}
-		switch (baseType) {
-			case "application/javascript":
-			case "application/x-javascript":
-			case "application/ecmascript":
-			case "application/x-ecmascript":
-			case "text/ecmascript":
-			case "text/x-ecmascript":
-			case "text/x-javascript":
-			case "text/jscript":
-			case "text/livescript":
-				return true;
-			default:
-				return false;
-		}
-	}
-
 	private static boolean needsCharset(String baseType) {
 		return baseType.startsWith("text/") || "application/xml".equals(baseType);
 	}
 
 	private static boolean hasCharsetParam(String mimeType) {
 		return mimeType.toLowerCase().contains("charset");
-	}
-
-	private static String baseType(String mimeType) {
-		int semi = mimeType.indexOf(';');
-		return (semi == -1 ? mimeType : mimeType.substring(0, semi)).trim().toLowerCase();
 	}
 
 	private static String replaceBase(String mimeType, String newBase) {

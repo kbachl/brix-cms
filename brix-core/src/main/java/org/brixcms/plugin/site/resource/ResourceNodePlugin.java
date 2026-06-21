@@ -64,6 +64,60 @@ public class ResourceNodePlugin implements SiteNodePlugin {
         }
     }
 
+    /**
+     * Normalizes a raw MIME type for <em>storage</em> as {@code jcr:mimeType}: returns the base type
+     * (lowercased, parameters stripped), migrating legacy JavaScript types to the modern
+     * {@code text/javascript} (RFC 9239). Use this when persisting a MIME type so the stored value is
+     * clean regardless of what a browser supplied on upload (browsers still send
+     * {@code application/x-javascript} for {@code .js} files). Returns {@code null} for {@code null}.
+     */
+    public static String normalizeMimeType(String mimeType) {
+        if (mimeType == null) {
+            return null;
+        }
+        String base = baseType(mimeType);
+        return isLegacyJavaScript(base) ? "text/javascript" : base;
+    }
+
+    /**
+     * The base type of a Content-Type value: the substring before the first {@code ;}, trimmed and
+     * lowercased.
+     */
+    public static String baseType(String mimeType) {
+        int semi = mimeType.indexOf(';');
+        return (semi == -1 ? mimeType : mimeType.substring(0, semi)).trim().toLowerCase();
+    }
+
+    /**
+     * Legacy JavaScript MIME types (RFC 9239 / WHATWG MIME Sniffing "JavaScript MIME type" group) that
+     * should be stored/served as the modern {@code text/javascript}. The canonical
+     * {@code text/javascript} itself is excluded because it needs no migration.
+     */
+    public static boolean isLegacyJavaScript(String baseType) {
+        if ("text/javascript".equals(baseType)) {
+            return false;
+        }
+        // Versioned forms live only under the text tree: RFC 9239 enumerates text/javascript1.0..1.5;
+        // some servers also emit higher/suffixed values, which are matched tolerantly here.
+        if (baseType.startsWith("text/javascript1")) {
+            return true;
+        }
+        switch (baseType) {
+            case "application/javascript":
+            case "application/x-javascript":
+            case "application/ecmascript":
+            case "application/x-ecmascript":
+            case "text/ecmascript":
+            case "text/x-ecmascript":
+            case "text/x-javascript":
+            case "text/jscript":
+            case "text/livescript":
+                return true;
+            default:
+                return false;
+        }
+    }
+
 
     public String getNodeType() {
         return TYPE;

@@ -84,7 +84,15 @@ public class ResourceNodeHandler implements IRequestHandler {
 			if (contentLength < 0) {
 				throw new IllegalStateException("Resource content length is negative for " + node.getPath());
 			}
-			String etag = createContentETag(resolveContentHash(node));
+
+			// Use the already-persisted hash (if any) for the ETag and the conditional decision. This is
+			// cheap: it only reads the two hash properties and compares the stored length against the
+			// current content length - it never reads or hashes the binary and never persists anything.
+			// When no up-to-date persisted hash exists yet, the ETag stays null and the conditional
+			// decision falls back to Last-Modified (and to "not modified == false" for If-None-Match,
+			// which is correct: without a server ETag there is nothing to match against).
+			String cachedHash = resolveCachedContentHash(node);
+			String etag = createContentETag(cachedHash);
 
 			response.setContentType(mimeType);
 			if (etag != null) {
@@ -99,11 +107,29 @@ public class ResourceNodeHandler implements IRequestHandler {
 				return;
 			}
 
-			String fileName = node.getName();
+			// We are about to send a representation. Only now is it worth ensuring a correct, persisted
+			// hash: on the first request after a content change this backfills and persists the hash (the
+			// write-on-read behaviour is intentionally retained); on subsequent requests it is a cheap
+			// cache hit. 304 and HEAD never reach this point, so they never hash or save.
 			boolean writeBody = !"HEAD".equalsIgnoreCase(r.getMethod());
+			if (cachedHash == null && writeBody) {
+				String ensuredEtag = createContentETag(resolveContentHash(node));
+				if (ensuredEtag != null) {
+					etag = ensuredEtag;
+					response.setHeader("ETag", etag);
+				}
+			}
+
+			// RFC 7233 If-Range: a client resuming a download sends the validator of the representation
+			// it already has. Only honour the Range when that validator still matches the current entity;
+			// otherwise serve the full representation so the client does not splice bytes of a new version
+			// into a partial download of the old one.
+			boolean allowRange = ifRangeMatches(r, etag, lastModified);
+
+			String fileName = node.getName();
 			InputStream stream = writeBody ? node.getDataAsStream() : InputStream.nullInputStream();
 
-			new Streamer(contentLength, stream, fileName, save, r, response, writeBody).stream();
+			new Streamer(contentLength, stream, fileName, save, r, response, writeBody, allowRange).stream();
 		} catch (Exception e) {
 			if (isClientAbort(e)) {
 				log.debug("Client aborted while streaming resource (ignored): {}", rootMessage(e));
@@ -160,6 +186,21 @@ public class ResourceNodeHandler implements IRequestHandler {
 		}
 	}
 
+	/**
+	 * Reads the already-persisted hash for the conditional decision without ever hashing the binary.
+	 * Mirrors {@link #resolveContentHash}: a transient JCR read failure must degrade gracefully to a
+	 * null ETag (so the request still succeeds) rather than escaping to the outer handler and turning
+	 * into an HTTP 500 - especially on the 304/HEAD path that does not even need the hash.
+	 */
+	private static String resolveCachedContentHash(BrixFileNode node) {
+		try {
+			return node.getCachedContentSha256();
+		} catch (RuntimeException e) {
+			log.warn("Unable to read cached content hash for {}", node.getPath(), e);
+			return null;
+		}
+	}
+
 	static String createContentETag(String contentSha256) {
 		if (Strings.isEmpty(contentSha256)) {
 			return null;
@@ -179,12 +220,17 @@ public class ResourceNodeHandler implements IRequestHandler {
 	}
 
 	static boolean matchesETag(String header, String etag) {
-		if (Strings.isEmpty(etag)) {
-			return false;
-		}
 		for (String candidate : header.split(",")) {
 			String trimmed = candidate.trim();
-			if ("*".equals(trimmed) || etag.equals(trimmed) || stripWeakPrefix(etag).equals(stripWeakPrefix(trimmed))) {
+			// The wildcard matches resource existence (RFC 7232), not a specific server ETag, so it is
+			// evaluated even when we do not (yet) have a persisted hash and therefore no ETag to compare
+			// against. Without this, an uncached resource answering "If-None-Match: *" would wrongly get
+			// a 200 instead of 304.
+			if ("*".equals(trimmed)) {
+				return true;
+			}
+			if (!Strings.isEmpty(etag)
+					&& (etag.equals(trimmed) || stripWeakPrefix(etag).equals(stripWeakPrefix(trimmed)))) {
 				return true;
 			}
 		}
@@ -205,6 +251,42 @@ public class ResourceNodeHandler implements IRequestHandler {
 		} catch (IllegalArgumentException ignored) {
 			return false;
 		}
+	}
+
+	/**
+	 * Evaluates an {@code If-Range} precondition (RFC 7233) against the current entity and reports
+	 * whether a Range request may be honoured.
+	 * <p>
+	 * Returns {@code true} (range allowed) when there is no {@code If-Range} header, or when its
+	 * validator still matches the current representation. Returns {@code false} when {@code If-Range}
+	 * is present but does not match, which makes the caller serve the full representation instead of a
+	 * partial one - preventing a resuming client from splicing bytes of a new version into a partial
+	 * download of the old one.
+	 * <p>
+	 * The validator is either an HTTP-date or an entity-tag. The entity-tag comparison reuses
+	 * {@link #matchesETag} (weak/strong tolerant); this is safe here because the ETag is a content hash,
+	 * so a match guarantees byte-identical content.
+	 */
+	static boolean ifRangeMatches(HttpServletRequest request, String etag, Date lastModified) {
+		String ifRange = request.getHeader("If-Range");
+		if (Strings.isEmpty(ifRange)) {
+			return true;
+		}
+		long ifRangeDate;
+		try {
+			ifRangeDate = request.getDateHeader("If-Range");
+		} catch (IllegalArgumentException notADate) {
+			ifRangeDate = -1;
+		}
+		if (ifRangeDate != -1) {
+			// HTTP-date form: the range is valid only if the entity has not changed since that date.
+			if (lastModified == null) {
+				return false;
+			}
+			return lastModified.getTime() / 1000 <= ifRangeDate / 1000;
+		}
+		// Entity-tag form.
+		return matchesETag(ifRange, etag);
 	}
 
 	private static boolean isClientAbort(Throwable e) {

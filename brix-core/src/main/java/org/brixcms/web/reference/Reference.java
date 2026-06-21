@@ -280,7 +280,7 @@ public class Reference implements Serializable, IDetachable {
             return false;
         } else {
             return parameters.getIndexedCount() > 0
-                    && parameters.getNamedKeys().size() > 0;
+                    || parameters.getNamedKeys().size() > 0;
         }
     }
 

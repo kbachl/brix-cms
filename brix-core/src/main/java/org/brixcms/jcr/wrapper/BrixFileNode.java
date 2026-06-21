@@ -155,6 +155,25 @@ public class BrixFileNode extends BrixNode {
         return null;
     }
 
+    /**
+     * Returns the persisted SHA-256 of the current content if one is already stored and still matches
+     * the current content length, or {@code null} otherwise.
+     * <p>
+     * Unlike {@link #ensureContentSha256()} this never reads or hashes the binary and never persists
+     * anything: it only reads the two hash properties and compares the stored length against the current
+     * content length. It is therefore cheap to call on every request - including conditional (304) and
+     * HEAD requests that will never stream a body - so the ETag/conditional decision can be made without
+     * touching the binary. When no up-to-date persisted hash exists yet the caller gets {@code null} and
+     * can decide whether hashing is warranted (e.g. only when actually sending a body).
+     */
+    public String getCachedContentSha256() {
+        String hash = getContentSha256();
+        if (hash != null && isPersistedHashForCurrentContent()) {
+            return hash;
+        }
+        return null;
+    }
+
     public String ensureContentSha256() {
         String hash = getContentSha256();
         if (hash != null && isPersistedHashForCurrentContent()) {

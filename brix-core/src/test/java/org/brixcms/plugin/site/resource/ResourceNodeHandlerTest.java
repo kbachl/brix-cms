@@ -39,6 +39,30 @@ public class ResourceNodeHandlerTest {
     }
 
     @Test
+    public void ifNoneMatchWildcardMatchesExistingResourceEvenWithoutServerETag() {
+        // Regression: an existing resource whose hash has not been persisted yet has no server ETag, but a
+        // client sending "If-None-Match: *" must still get a 304 - the wildcard matches resource existence
+        // (RFC 7232), not a specific ETag. On the old code this returned false because the empty-etag guard
+        // ran before the wildcard check.
+        HttpServletRequest request = request(Map.of("If-None-Match", "*"), -1L);
+
+        boolean notModified = ResourceNodeHandler.isNotModified(request, null, null);
+
+        assertTrue(notModified);
+    }
+
+    @Test
+    public void ifNoneMatchSpecificValueDoesNotMatchWhenServerHasNoETag() {
+        // Without a server ETag a specific validator cannot be confirmed, so the request must not be a
+        // 304 - it is served normally and the hash is backfilled for the next request.
+        HttpServletRequest request = request(Map.of("If-None-Match", "\"sha256-abc123\""), -1L);
+
+        boolean notModified = ResourceNodeHandler.isNotModified(request, null, null);
+
+        assertFalse(notModified);
+    }
+
+    @Test
     public void ifModifiedSinceIsHonoredEvenWhenContentETagExists() {
         // No If-None-Match is sent. Even though the resource carries an ETag, the server must honor
         // If-Modified-Since for clients that rely on it (RFC 7232 precedence: If-None-Match only
@@ -63,6 +87,60 @@ public class ResourceNodeHandlerTest {
         assertTrue(notModified);
     }
 
+    @Test
+    public void ifRangeAbsentAllowsRange() {
+        HttpServletRequest request = ifRangeRequest(null, false, -1L);
+
+        boolean rangeAllowed = ResourceNodeHandler.ifRangeMatches(request,
+                ResourceNodeHandler.createContentETag("abc123"), new Date(0));
+
+        assertTrue(rangeAllowed);
+    }
+
+    @Test
+    public void ifRangeEtagMatchAllowsRange() {
+        String etag = ResourceNodeHandler.createContentETag("abc123");
+        HttpServletRequest request = ifRangeRequest(etag, false, -1L);
+
+        assertTrue(ResourceNodeHandler.ifRangeMatches(request, etag, new Date(0)));
+    }
+
+    @Test
+    public void ifRangeEtagMismatchForbidsRange() {
+        String current = ResourceNodeHandler.createContentETag("abc123");
+        HttpServletRequest request = ifRangeRequest(ResourceNodeHandler.createContentETag("xyz"), false, -1L);
+
+        // Validator does not match the current entity -> must serve full response, not a range, so the
+        // client cannot splice bytes of the new version into a partial download of the old one.
+        assertFalse(ResourceNodeHandler.ifRangeMatches(request, current, new Date(0)));
+    }
+
+    @Test
+    public void ifRangeDateNotModifiedSinceAllowsRange() {
+        // entity last modified at t=1000s; If-Range date t=2000s -> unchanged since -> range allowed
+        HttpServletRequest request = ifRangeRequest("Wed, 10 Jun 2026 12:00:00 GMT", true, 2_000_000L);
+
+        assertTrue(ResourceNodeHandler.ifRangeMatches(request,
+                ResourceNodeHandler.createContentETag("abc123"), new Date(1_000_000L)));
+    }
+
+    @Test
+    public void ifRangeDateModifiedSinceForbidsRange() {
+        // entity last modified at t=3000s; If-Range date t=2000s -> changed since -> full response
+        HttpServletRequest request = ifRangeRequest("Wed, 10 Jun 2026 12:00:00 GMT", true, 2_000_000L);
+
+        assertFalse(ResourceNodeHandler.ifRangeMatches(request,
+                ResourceNodeHandler.createContentETag("abc123"), new Date(3_000_000L)));
+    }
+
+    @Test
+    public void ifRangeDateWithNullLastModifiedForbidsRange() {
+        HttpServletRequest request = ifRangeRequest("Wed, 10 Jun 2026 12:00:00 GMT", true, 2_000_000L);
+
+        assertFalse(ResourceNodeHandler.ifRangeMatches(request,
+                ResourceNodeHandler.createContentETag("abc123"), null));
+    }
+
     private static HttpServletRequest request(Map<String, String> headers, long dateHeader) {
         Map<String, String> copy = new HashMap<String, String>(headers);
         InvocationHandler handler = (Object proxy, Method method, Object[] args) -> {
@@ -71,6 +149,34 @@ public class ResourceNodeHandlerTest {
             }
             if ("getDateHeader".equals(method.getName()) && args != null && args.length == 1) {
                 return dateHeader;
+            }
+            return defaultValue(method.getReturnType());
+        };
+        return (HttpServletRequest) Proxy.newProxyInstance(ResourceNodeHandlerTest.class.getClassLoader(),
+                new Class<?>[] { HttpServletRequest.class }, handler);
+    }
+
+    /**
+     * Builds a request that carries only an {@code If-Range} header. When {@code dateParseable} is
+     * {@code true} the container parses it as an HTTP-date returning {@code ifRangeDate}; otherwise
+     * parsing throws {@link IllegalArgumentException}, mimicking a container faced with an entity-tag
+     * value (which the production code then treats as an entity-tag rather than a date).
+     */
+    private static HttpServletRequest ifRangeRequest(String ifRangeHeader, boolean dateParseable, long ifRangeDate) {
+        Map<String, String> headers = new HashMap<String, String>();
+        if (ifRangeHeader != null) {
+            headers.put("If-Range", ifRangeHeader);
+        }
+        InvocationHandler handler = (Object proxy, Method method, Object[] args) -> {
+            if ("getHeader".equals(method.getName()) && args != null && args.length == 1) {
+                return headers.get(args[0]);
+            }
+            if ("getDateHeader".equals(method.getName()) && args != null && args.length == 1
+                    && "If-Range".equals(args[0])) {
+                if (!dateParseable) {
+                    throw new IllegalArgumentException("not a valid HTTP-date");
+                }
+                return ifRangeDate;
             }
             return defaultValue(method.getReturnType());
         };

@@ -37,14 +37,25 @@ class Streamer {
     private final HttpServletRequest request;
     private final WebResponse response;
     private final boolean writeBody;
+    private final boolean allowRange;
 
     public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
                     HttpServletRequest request, WebResponse response) {
-        this(length, inputStream, fileName, attachment, request, response, true);
+        this(length, inputStream, fileName, attachment, request, response, true, true);
     }
 
     public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
                     HttpServletRequest request, WebResponse response, boolean writeBody) {
+        this(length, inputStream, fileName, attachment, request, response, writeBody, true);
+    }
+
+    /**
+     * @param allowRange when {@code false} a Range request is ignored and the full representation is
+     *                   served (used to implement the RFC 7233 {@code If-Range} semantics: if the client's
+     *                   validator does not match the current entity, a partial response must not be sent)
+     */
+    public Streamer(long length, InputStream inputStream, String fileName, boolean attachment,
+                    HttpServletRequest request, WebResponse response, boolean writeBody, boolean allowRange) {
         this.length = length;
         this.inputStream = inputStream;
         this.fileName = fileName;
@@ -52,12 +63,13 @@ class Streamer {
         this.request = request;
         this.attachment = attachment;
         this.writeBody = writeBody;
+        this.allowRange = allowRange;
     }
 
     private static final int BUFFER_SIZE = (int) Bytes.kilobytes(64).bytes();
 
     public long stream() {
-        Range range = parseRange(request.getHeader("Range"), length);
+        Range range = parseRange(allowRange ? request.getHeader("Range") : null, length);
         long first = 0;
         long last = length - 1;
         long contentLength = length;

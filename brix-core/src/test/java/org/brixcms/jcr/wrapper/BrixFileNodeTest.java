@@ -2,6 +2,7 @@ package org.brixcms.jcr.wrapper;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayInputStream;
@@ -131,6 +132,64 @@ public class BrixFileNodeTest {
         assertEquals("hash must reflect the current content", file.calculateContentSha256(), recomputed);
         // After recompute the persisted length matches, so the property now holds the fresh value.
         assertEquals(recomputed, file.getContentSha256());
+    }
+
+    @Test
+    public void getCachedContentSha256ReturnsThePersistedHash() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login();
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+
+        BrixFileNode file = BrixFileNode.initialize(node, "text/css");
+        file.setData("body");
+        root.save();
+
+        String expected = file.calculateContentSha256();
+        // The persisted hash is up to date, so the cheap accessor returns it verbatim.
+        assertEquals(expected, file.getCachedContentSha256());
+    }
+
+    @Test
+    public void getCachedContentSha256IsNullAndPersistsNothingWhenNoHashExists()
+            throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login();
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+        BrixFileNode file = BrixFileNode.initialize(node, "text/css");
+        root.save();
+
+        // No hash has been persisted yet. The cheap accessor must return null and must NOT compute,
+        // persist, or add the brix mixin - so it stays safe on the 304/HEAD hot path.
+        assertNull(file.getCachedContentSha256());
+        assertFalse(file.hasProperty(Brix.NS_PREFIX + "contentSha256"));
+        assertFalse(file.isNodeType(BrixNode.JCR_TYPE_BRIX_NODE));
+    }
+
+    @Test
+    public void getCachedContentSha256IsNullAfterExternalContentChangeButEnsureRecomputes()
+            throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login();
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+
+        BrixFileNode file = BrixFileNode.initialize(node, "text/css");
+        file.setData("body");
+        root.save();
+
+        // Replace content bypassing setData (e.g. an XML workspace import): the stored length no longer
+        // matches, so the persisted hash is considered stale and the cheap accessor returns null.
+        file.getNode("jcr:content").setProperty("jcr:data", "a completely different body");
+        root.save();
+
+        assertNull(file.getCachedContentSha256());
+        String recomputed = file.ensureContentSha256();
+        assertEquals(file.calculateContentSha256(), recomputed);
     }
 
     private static void registerBrixNodeTypes(Workspace workspace) throws RepositoryException {

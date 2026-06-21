@@ -70,6 +70,23 @@ public class StreamerTest {
     }
 
     @Test
+    public void rangeIsIgnoredWhenNotAllowed() {
+        // RFC 7233 If-Range mismatch (allowRange == false): the full representation is served instead of
+        // a partial one, so a resuming client cannot splice bytes of a new version into an old partial
+        // download. Guards the actual effect of fix #4 end-to-end (not just the ifRangeMatches helper).
+        byte[] data = bytes("abcdef");
+        CapturingResponse response = new CapturingResponse();
+
+        new Streamer(data.length, new ByteArrayInputStream(data), "asset.txt", false,
+                request("bytes=2-3"), response, true, false).stream();
+
+        assertEquals(HttpServletResponse.SC_OK, response.status);
+        assertFalse(response.headers.containsKey("Content-Range"));
+        assertEquals(data.length, response.contentLength);
+        assertArrayEquals(data, response.body.toByteArray());
+    }
+
+    @Test
     public void unsatisfiableRangeReturns416WithoutBody() {
         byte[] data = bytes("abcdef");
         CapturingResponse response = new CapturingResponse();

@@ -26,6 +26,8 @@ import org.apache.wicket.request.http.WebRequest;
 import org.apache.wicket.request.http.WebResponse;
 import org.apache.wicket.util.string.Strings;
 import org.brixcms.Brix;
+import org.brixcms.auth.Action;
+import org.brixcms.auth.ViewWorkspaceAction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,34 +58,68 @@ public class WorkspaceUtils {
         }
 
         workspace = getWorkspaceFromUrl();
-        if (workspace != null) {
+        if (workspace != null && isWorkspaceAccessible(workspace)) {
             return workspace;
         }
 
-        if (workspace == null) {
-            WebRequest req = (WebRequest) RequestCycle.get().getRequest();
-            WebResponse resp = (WebResponse) RequestCycle.get().getResponse();
-            Cookie cookie = req.getCookie(COOKIE_NAME);
-            workspace = getDefaultWorkspaceName();
-            if (cookie != null) {
-                if (cookie.getValue() != null)
-                    workspace = cookie.getValue();
-            }
-            if (!checkSession(workspace)) {
-                workspace = getDefaultWorkspaceName();
-            }
-            if (workspace == null) {
-                throw new IllegalStateException("Could not resolve jcr workspace to use for this request");
-            }
-            Cookie c = new Cookie(COOKIE_NAME, workspace);
-            c.setPath("/");
-            if (workspace.toString().equals(getDefaultWorkspaceName()) == false)
-                resp.addCookie(c);
-            else if (cookie != null)
-                resp.clearCookie(cookie);
-            rc.setMetaData(WORKSPACE_METADATA, workspace);
+        // The URL did not yield a usable workspace (none provided, unknown, or not authorized for the
+        // current user): fall back to the remembered/default workspace. The cookie may hold a previously
+        // selected workspace, but it is re-validated too, so a workspace remembered from an authenticated
+        // preview session cannot leak to an anonymous visitor after logout.
+        WebRequest req = (WebRequest) RequestCycle.get().getRequest();
+        WebResponse resp = (WebResponse) RequestCycle.get().getResponse();
+        Cookie cookie = req.getCookie(COOKIE_NAME);
+        workspace = getDefaultWorkspaceName();
+        if (cookie != null && cookie.getValue() != null && isWorkspaceAccessible(cookie.getValue())) {
+            workspace = cookie.getValue();
         }
+        if (!checkSession(workspace)) {
+            workspace = getDefaultWorkspaceName();
+        }
+        if (workspace == null) {
+            throw new IllegalStateException("Could not resolve jcr workspace to use for this request");
+        }
+        Cookie c = new Cookie(COOKIE_NAME, workspace);
+        c.setPath("/");
+        if (workspace.toString().equals(getDefaultWorkspaceName()) == false) {
+            resp.addCookie(c);
+        } else if (cookie != null) {
+            resp.clearCookie(cookie);
+        }
+        rc.setMetaData(WORKSPACE_METADATA, workspace);
         return workspace;
+    }
+
+    /**
+     * Tells whether the current user may use {@code workspaceId} to serve content for this request.
+     * <p>
+     * A workspace taken from a request URL ({@code ?brix:workspace=} parameter or referer) or from the
+     * {@code brix-revision} cookie is only honoured when it exists <em>and</em> the
+     * {@link org.brixcms.auth.AuthorizationStrategy} permits viewing it in the presentation context. This
+     * prevents an anonymous visitor from forcing a non-default (e.g. draft/staging) workspace by adding
+     * a request parameter, which would otherwise serve unpublished content. When access is not permitted
+     * the caller falls back to the default workspace.
+     * <p>
+     * The existence check uses {@link WorkspaceManager#workspaceExists(String)} rather than relying on
+     * {@link WorkspaceManager#getWorkspace(String)} returning {@code null}: the RMI client implementation
+     * returns a non-null {@code Workspace} even for unknown ids.
+     * <p>
+     * <strong>Note:</strong> this security gate has no automated unit test because it depends on
+     * {@code Brix.get()}, a live {@code WorkspaceManager} and {@code AuthorizationStrategy} and an active
+     * {@code RequestCycle}. It must be verified manually or via an integration test (URL parameter denied
+     * for unauthorized users, cookie re-validated, unknown workspace falls back to default).
+     */
+    private static boolean isWorkspaceAccessible(String workspaceId) {
+        if (Strings.isEmpty(workspaceId)) {
+            return false;
+        }
+        Brix brix = Brix.get();
+        if (!brix.getWorkspaceManager().workspaceExists(workspaceId)) {
+            return false;
+        }
+        Workspace workspace = brix.getWorkspaceManager().getWorkspace(workspaceId);
+        return brix.getAuthorizationStrategy()
+                .isActionAuthorized(new ViewWorkspaceAction(Action.Context.PRESENTATION, workspace));
     }
 
     private static String getWorkspaceFromUrl() {

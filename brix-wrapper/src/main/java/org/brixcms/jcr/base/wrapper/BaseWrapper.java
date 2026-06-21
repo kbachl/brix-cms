@@ -37,7 +37,7 @@ class BaseWrapper<T> {
         if (this == obj) {
             return true;
         }
-        if (obj instanceof BaseWrapper) {
+        if ((obj instanceof BaseWrapper) == false) {
             return false;
         }
         BaseWrapper wrapper = (BaseWrapper) obj;

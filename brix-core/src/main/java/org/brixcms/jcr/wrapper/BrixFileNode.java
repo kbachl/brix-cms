@@ -200,11 +200,16 @@ public class BrixFileNode extends BrixNode {
      * same length is not detected. Fully closing that would require re-hashing on every request (cost on
      * the 304 hot path) or a JCR observation listener (extra complexity). It is out of scope because the
      * realistic bypass here - whole-workspace XML import - carries a self-consistent jcr:data/hash pair.
+     * <p>
+     * Migration note: content hashed before the length property existed (pre-10.16.1) carries no length.
+     * Such nodes are trusted as-is rather than re-hashed on every request - only nodes that actually store
+     * a length are re-validated. Without this, every legacy resource would be re-hashed (and re-saved) on
+     * each body-serving request, which is a heavy regression when the serve path cannot persist the backfill.
      */
     private boolean isPersistedHashForCurrentContent() {
         try {
             if (!hasProperty(JCR_PROP_CONTENT_SHA256_LENGTH)) {
-                return false;
+                return true;
             }
             return getProperty(JCR_PROP_CONTENT_SHA256_LENGTH).getLong() == getContentLength();
         } catch (RuntimeException e) {

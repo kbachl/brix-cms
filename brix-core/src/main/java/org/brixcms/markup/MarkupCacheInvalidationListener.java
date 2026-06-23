@@ -74,7 +74,6 @@ public class MarkupCacheInvalidationListener implements SaveEventListener {
             if (plugin == null) {
                 return;
             }
-            AbstractContainer.invalidateVariableValues(toBrixNode(container));
             invalidateContainerAndDependents(plugin.getMarkupCache(), container);
         } catch (RuntimeException e) {
             log.debug("Failed to invalidate markup cache for {}", safePath(node), e);
@@ -84,12 +83,6 @@ public class MarkupCacheInvalidationListener implements SaveEventListener {
     private JcrNode resolveContainerNode(JcrNode node) {
         if (isContainerNode(node)) {
             return node;
-        }
-        if (AbstractContainer.VARIABLES_NODE_NAME.equals(node.getName())) {
-            JcrNode parent = node.getParent();
-            if (parent != null && isContainerNode(parent)) {
-                return parent;
-            }
         }
         if (!"jcr:content".equals(node.getName())) {
             return null;

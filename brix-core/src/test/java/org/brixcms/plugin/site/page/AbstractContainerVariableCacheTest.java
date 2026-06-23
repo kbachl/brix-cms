@@ -23,98 +23,99 @@ import java.util.Map;
 
 import javax.jcr.Node;
 
+import org.apache.wicket.ThreadContext;
+import org.apache.wicket.mock.MockWebRequest;
+import org.apache.wicket.mock.MockWebResponse;
+import org.apache.wicket.request.IExceptionMapper;
+import org.apache.wicket.request.IRequestHandler;
+import org.apache.wicket.request.IRequestMapper;
+import org.apache.wicket.request.Request;
+import org.apache.wicket.request.Url;
+import org.apache.wicket.request.cycle.RequestCycle;
+import org.apache.wicket.request.cycle.RequestCycleContext;
 import org.brixcms.Brix;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.jcr.api.JcrWorkspace;
 import org.easymock.EasyMock;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Test;
 
 public class AbstractContainerVariableCacheTest {
-    @Before
-    public void setUp() {
-        AbstractContainer.invalidateAllVariableValues();
-    }
+    private static final IRequestMapper NOOP_REQUEST_MAPPER = new IRequestMapper() {
+        @Override
+        public IRequestHandler mapRequest(Request request) {
+            return null;
+        }
 
-    @After
-    public void tearDown() {
-        AbstractContainer.invalidateAllVariableValues();
-    }
+        @Override
+        public int getCompatibilityScore(Request request) {
+            return 0;
+        }
+
+        @Override
+        public Url mapHandler(IRequestHandler requestHandler) {
+            return null;
+        }
+    };
+
+    private static final IExceptionMapper NOOP_EXCEPTION_MAPPER = exception -> null;
 
     @Test
-    public void localVariablesAreLoadedOnceUntilInvalidated() {
+    public void localVariablesAreLoadedOncePerRequest() {
         VariableContainer container = new VariableContainer("page-id", "test-workspace");
         container.setLocalVariable("title", "Title");
         container.setLocalVariable("headline", "Headline");
 
-        assertEquals("Title", container.getVariableValue("title", false));
-        assertEquals("Headline", container.getVariableValue("headline", false));
-        assertEquals(new ArrayList<String>(container.variables.keySet()), container.getSavedVariableKeys());
-        assertEquals("Title", container.getVariableValue("title", false));
-        assertEquals(1, container.localVariableLoads);
+        withRequestCycle(() -> {
+            assertEquals("Title", container.getVariableValue("title", false));
+            assertEquals("Headline", container.getVariableValue("headline", false));
+            assertEquals(new ArrayList<String>(container.variables.keySet()), container.getSavedVariableKeys());
+            assertEquals(1, container.localVariableLoads);
+        });
     }
 
     @Test
-    public void localVariableCacheIsSeparatedByWorkspace() {
-        VariableContainer liveContainer = new VariableContainer("page-id", "live-workspace");
-        VariableContainer previewContainer = new VariableContainer("page-id", "preview-workspace");
-        liveContainer.setLocalVariable("title", "Live");
-        previewContainer.setLocalVariable("title", "Preview");
-
-        assertEquals("Live", liveContainer.getVariableValue("title", false));
-        assertEquals("Preview", previewContainer.getVariableValue("title", false));
-        assertEquals(1, liveContainer.localVariableLoads);
-        assertEquals(1, previewContainer.localVariableLoads);
-    }
-
-    @Test
-    public void workspaceInvalidationClearsOnlyMatchingEntries() {
-        VariableContainer liveContainer = new VariableContainer("page-id", "live-workspace");
-        VariableContainer previewContainer = new VariableContainer("page-id", "preview-workspace");
-        liveContainer.setLocalVariable("title", "Live");
-        previewContainer.setLocalVariable("title", "Preview");
-
-        assertEquals("Live", liveContainer.getVariableValue("title", false));
-        assertEquals("Preview", previewContainer.getVariableValue("title", false));
-
-        liveContainer.setLocalVariable("title", "Live updated");
-        previewContainer.setLocalVariable("title", "Preview updated");
-        AbstractContainer.invalidateVariableValuesForWorkspace("live-workspace");
-
-        assertEquals("Live updated", liveContainer.getVariableValue("title", false));
-        assertEquals("Preview", previewContainer.getVariableValue("title", false));
-        assertEquals(2, liveContainer.localVariableLoads);
-        assertEquals(1, previewContainer.localVariableLoads);
-    }
-
-    @Test
-    public void allInvalidationClearsCachedVariables() {
+    public void localVariableCacheIsRequestScoped() {
         VariableContainer container = new VariableContainer("page-id", "test-workspace");
         container.setLocalVariable("title", "Title");
 
-        assertEquals("Title", container.getVariableValue("title", false));
-        container.setLocalVariable("title", "Updated");
-        AbstractContainer.invalidateAllVariableValues();
+        withRequestCycle(() -> assertEquals("Title", container.getVariableValue("title", false)));
+        withRequestCycle(() -> assertEquals("Title", container.getVariableValue("title", false)));
 
-        assertEquals("Updated", container.getVariableValue("title", false));
         assertEquals(2, container.localVariableLoads);
     }
 
     @Test
-    public void setVariableValueInvalidatesCache() {
+    public void setVariableValueInvalidatesCurrentRequestCache() {
         VariableContainer container = new VariableContainer("page-id", "test-workspace");
         container.setLocalVariable("title", "Old");
 
-        assertEquals("Old", container.getVariableValue("title", false));
-        assertEquals(1, container.localVariableLoads);
+        withRequestCycle(() -> {
+            assertEquals("Old", container.getVariableValue("title", false));
+            assertEquals(1, container.localVariableLoads);
 
-        container.setLocalVariable("title", "New");
-        container.setVariableValue("title", "New");
+            container.setLocalVariable("title", "New");
+            container.setVariableValue("title", "New");
 
-        assertEquals("New", container.getVariableValue("title", false));
-        assertEquals(2, container.localVariableLoads);
+            assertEquals("New", container.getVariableValue("title", false));
+            assertEquals(2, container.localVariableLoads);
+        });
+    }
+
+    private static void withRequestCycle(Runnable callback) {
+        ThreadContext previous = ThreadContext.detach();
+        RequestCycle cycle = new RequestCycle(new RequestCycleContext(
+                new MockWebRequest(Url.parse("/")),
+                new MockWebResponse(),
+                NOOP_REQUEST_MAPPER,
+                NOOP_EXCEPTION_MAPPER));
+        ThreadContext.setRequestCycle(cycle);
+        try {
+            callback.run();
+        } finally {
+            ThreadContext.detach();
+            ThreadContext.restore(previous);
+        }
     }
 
     private static class VariableContainer extends AbstractContainer {

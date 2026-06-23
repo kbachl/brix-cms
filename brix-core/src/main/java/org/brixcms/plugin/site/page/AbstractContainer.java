@@ -14,8 +14,8 @@
 
 package org.brixcms.plugin.site.page;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import org.apache.wicket.MetaDataKey;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.brixcms.Brix;
 import org.brixcms.exception.NodeNotFoundException;
 import org.brixcms.jcr.JcrUtil;
@@ -34,15 +34,14 @@ import org.brixcms.plugin.site.page.tile.TileContainerFacet;
 import org.brixcms.plugin.site.page.tile.TileTag;
 
 import javax.jcr.Node;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 
 public abstract class AbstractContainer extends BrixFileNode
@@ -54,12 +53,11 @@ public abstract class AbstractContainer extends BrixFileNode
      */
     public static final String MARKUP_TILE_ID = "id";
 
-    public static final String VARIABLES_NODE_NAME = Brix.NS_PREFIX + "variables";
+    private static final String VARIABLES_NODE_NAME = Brix.NS_PREFIX + "variables";
 
-    private static final Cache<VariableValuesCacheKey, Map<String, String>> VARIABLE_VALUES_CACHE = Caffeine.newBuilder()
-            .maximumSize(100_000)
-            .expireAfterWrite(Duration.ofHours(1))
-            .build();
+    private static final MetaDataKey<Map<String, Map<String, String>>> VARIABLE_VALUES_CACHE_KEY =
+            new MetaDataKey<Map<String, Map<String, String>>>() {
+            };
 
     private final TileContainerFacet tileManager;
 
@@ -68,30 +66,7 @@ public abstract class AbstractContainer extends BrixFileNode
         tileManager = new TileContainerFacet(this);
     }
 
-    public static void invalidateVariableValues(BrixNode node) {
-        VariableValuesCacheKey cacheKey = getVariableValuesCacheKey(node);
-        if (cacheKey != null) {
-            VARIABLE_VALUES_CACHE.invalidate(cacheKey);
-        }
-    }
 
-    public static void invalidateVariableValuesForSession(JcrSession session) {
-        if (session == null) {
-            return;
-        }
-        invalidateVariableValuesForWorkspace(session.getWorkspace().getName());
-    }
-
-    public static void invalidateVariableValuesForWorkspace(String workspaceName) {
-        if (workspaceName == null) {
-            return;
-        }
-        VARIABLE_VALUES_CACHE.asMap().keySet().removeIf(key -> workspaceName.equals(key.workspaceName));
-    }
-
-    public static void invalidateAllVariableValues() {
-        VARIABLE_VALUES_CACHE.invalidateAll();
-    }
 
     /**
      * Returns collection of possible variable keys for this node.
@@ -293,11 +268,28 @@ public abstract class AbstractContainer extends BrixFileNode
     }
 
     private Map<String, String> getLocalVariableValues() {
-        VariableValuesCacheKey cacheKey = getVariableValuesCacheKey();
+        String cacheKey = getVariableValuesCacheKey();
         if (cacheKey == null) {
             return loadLocalVariableValues();
         }
-        return VARIABLE_VALUES_CACHE.get(cacheKey, ignored -> loadLocalVariableValues());
+
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null) {
+            return loadLocalVariableValues();
+        }
+
+        Map<String, Map<String, String>> cache = cycle.getMetaData(VARIABLE_VALUES_CACHE_KEY);
+        if (cache == null) {
+            cache = new HashMap<String, Map<String, String>>();
+            cycle.setMetaData(VARIABLE_VALUES_CACHE_KEY, cache);
+        }
+
+        Map<String, String> values = cache.get(cacheKey);
+        if (values == null) {
+            values = loadLocalVariableValues();
+            cache.put(cacheKey, values);
+        }
+        return values;
     }
 
     protected Map<String, String> loadLocalVariableValues() {
@@ -320,49 +312,27 @@ public abstract class AbstractContainer extends BrixFileNode
     }
 
     private void invalidateLocalVariableValues() {
-        VariableValuesCacheKey cacheKey = getVariableValuesCacheKey();
-        if (cacheKey != null) {
-            VARIABLE_VALUES_CACHE.invalidate(cacheKey);
+        String cacheKey = getVariableValuesCacheKey();
+        if (cacheKey == null) {
+            return;
+        }
+
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null) {
+            return;
+        }
+
+        Map<String, Map<String, String>> cache = cycle.getMetaData(VARIABLE_VALUES_CACHE_KEY);
+        if (cache != null) {
+            cache.remove(cacheKey);
         }
     }
 
-    private VariableValuesCacheKey getVariableValuesCacheKey() {
-        return getVariableValuesCacheKey(this);
-    }
-
-    private static VariableValuesCacheKey getVariableValuesCacheKey(BrixNode node) {
-        if (node == null || !node.isNodeType("mix:referenceable")) {
+    private String getVariableValuesCacheKey() {
+        if (!isNodeType("mix:referenceable")) {
             return null;
         }
-        return new VariableValuesCacheKey(node.getSession().getWorkspace().getName(), node.getIdentifier());
-    }
-
-    private static class VariableValuesCacheKey {
-        private final String workspaceName;
-        private final String containerIdentifier;
-
-        private VariableValuesCacheKey(String workspaceName, String containerIdentifier) {
-            this.workspaceName = workspaceName;
-            this.containerIdentifier = containerIdentifier;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) {
-                return true;
-            }
-            if (obj instanceof VariableValuesCacheKey == false) {
-                return false;
-            }
-            VariableValuesCacheKey that = (VariableValuesCacheKey) obj;
-            return Objects.equals(workspaceName, that.workspaceName)
-                    && Objects.equals(containerIdentifier, that.containerIdentifier);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(workspaceName, containerIdentifier);
-        }
+        return getSession().getWorkspace().getName() + ":" + getIdentifier();
     }
 
     private static class Properties {

@@ -26,7 +26,6 @@ import org.brixcms.jcr.api.JcrValueFactory;
 import org.brixcms.jcr.api.JcrWorkspace;
 import org.brixcms.jcr.exception.JcrException;
 import org.brixcms.jcr.wrapper.BrixNode;
-import org.brixcms.plugin.site.page.AbstractContainer;
 
 import javax.jcr.ImportUUIDBehavior;
 import javax.jcr.ItemNotFoundException;
@@ -37,10 +36,8 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * @author Matej Knopp
@@ -80,8 +77,6 @@ public class JcrUtil {
             JcrNode firstTargetRoot = targetRootNodeProvider.getTargetRootNode(nodes.iterator().next());
             String xmlns = createXMLNS(firstTargetRoot.getSession());
             Map<String, String> uuidMap = new HashMap<String, String>();
-            Set<String> targetWorkspaces = new HashSet<String>();
-            targetWorkspaces.add(firstTargetRoot.getSession().getWorkspace().getName());
 
             nodes = filterRedundantNodes(nodes);
 
@@ -89,14 +84,10 @@ public class JcrUtil {
 
             for (JcrNode node : nodes) {
                 JcrNode targetRoot = targetRootNodeProvider.getTargetRootNode(node);
-                targetWorkspaces.add(targetRoot.getSession().getWorkspace().getName());
                 createNode(node, targetRoot, xmlns, uuidMap, processedNodes, parentLimiter);
             }
 
             assignProperties(processedNodes, uuidMap);
-            for (String workspaceName : targetWorkspaces) {
-                AbstractContainer.invalidateVariableValuesForWorkspace(workspaceName);
-            }
         }
     }
 

@@ -50,6 +50,7 @@ import org.brixcms.plugin.site.SitePlugin;
 import org.brixcms.plugin.site.SiteRootNode;
 import org.brixcms.plugin.site.WebRootNode;
 import org.brixcms.plugin.site.folder.FolderNode;
+import org.brixcms.plugin.site.page.AbstractContainer;
 import org.brixcms.plugin.site.page.PageNode;
 import org.brixcms.plugin.site.page.TemplateNode;
 import org.brixcms.plugin.site.page.global.GlobalContainerNode;
@@ -297,6 +298,7 @@ public abstract class Brix {
     public void clone(JcrSession src, JcrSession dest) {
         cleanWorkspace(dest);
         cloneWorkspace(src, dest);
+        AbstractContainer.invalidateVariableValuesForSession(dest);
     }
 
     public void cleanWorkspace(JcrSession session) {
@@ -307,6 +309,7 @@ public abstract class Brix {
         }
 
         session.save();
+        AbstractContainer.invalidateVariableValuesForSession(session);
     }
 
     public String getRootPath() {
@@ -408,6 +411,7 @@ public abstract class Brix {
             p.initWorkspace(workspace, session);
         }
         session.save();
+        AbstractContainer.invalidateVariableValuesForSession(session);
     }
 
     public final Collection<Plugin> getPlugins() {

@@ -14,10 +14,13 @@
 
 package org.brixcms.plugin.site.page;
 
+import org.apache.wicket.MetaDataKey;
+import org.apache.wicket.request.cycle.RequestCycle;
 import org.brixcms.Brix;
 import org.brixcms.exception.NodeNotFoundException;
 import org.brixcms.jcr.JcrUtil;
 import org.brixcms.jcr.api.JcrNode;
+import org.brixcms.jcr.api.JcrProperty;
 import org.brixcms.jcr.api.JcrPropertyIterator;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.jcr.wrapper.BrixFileNode;
@@ -34,8 +37,11 @@ import javax.jcr.Node;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public abstract class AbstractContainer extends BrixFileNode
@@ -48,6 +54,10 @@ public abstract class AbstractContainer extends BrixFileNode
     public static final String MARKUP_TILE_ID = "id";
 
     private static final String VARIABLES_NODE_NAME = Brix.NS_PREFIX + "variables";
+
+    private static final MetaDataKey<Map<String, Map<String, String>>> VARIABLE_VALUES_CACHE_KEY =
+            new MetaDataKey<Map<String, Map<String, String>>>() {
+            };
 
     private final TileContainerFacet tileManager;
 
@@ -133,21 +143,11 @@ public abstract class AbstractContainer extends BrixFileNode
     }
 
     public List<String> getSavedVariableKeys() {
-        if (hasNode(VARIABLES_NODE_NAME)) {
-            JcrNode node = getNode(VARIABLES_NODE_NAME);
-            List<String> result = new ArrayList<String>();
-            JcrPropertyIterator i = node.getProperties();
-            while (i.hasNext()) {
-                String name = i.nextProperty().getName();
-                // filter out jcr: properties (or other possible brix properties)
-                if (!name.contains(":")) {
-                    result.add(name);
-                }
-            }
-            return result;
-        } else {
+        Map<String, String> values = getLocalVariableValues();
+        if (values.isEmpty()) {
             return Collections.emptyList();
         }
+        return new ArrayList<String>(values.keySet());
     }
 
     public String getTemplatePath() {
@@ -205,11 +205,9 @@ public abstract class AbstractContainer extends BrixFileNode
     }
 
     public String getVariableValue(String key, boolean followTemplate) {
-        if (hasNode(VARIABLES_NODE_NAME)) {
-            JcrNode node = getNode(VARIABLES_NODE_NAME);
-            if (node.hasProperty(key)) {
-                return node.getProperty(key).getString();
-            }
+        String value = getLocalVariableValues().get(key);
+        if (value != null) {
+            return value;
         }
         if (followTemplate) {
             TemplateNode template = getTemplate();
@@ -255,6 +253,7 @@ public abstract class AbstractContainer extends BrixFileNode
     }
 
     public void setVariableValue(String key, String value) {
+        invalidateLocalVariableValues();
         final JcrNode node;
         if (hasNode(VARIABLES_NODE_NAME)) {
             node = getNode(VARIABLES_NODE_NAME);
@@ -266,6 +265,74 @@ public abstract class AbstractContainer extends BrixFileNode
 
     public TileContainerFacet tiles() {
         return tileManager;
+    }
+
+    private Map<String, String> getLocalVariableValues() {
+        String cacheKey = getVariableValuesCacheKey();
+        if (cacheKey == null) {
+            return loadLocalVariableValues();
+        }
+
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null) {
+            return loadLocalVariableValues();
+        }
+
+        Map<String, Map<String, String>> cache = cycle.getMetaData(VARIABLE_VALUES_CACHE_KEY);
+        if (cache == null) {
+            cache = new HashMap<String, Map<String, String>>();
+            cycle.setMetaData(VARIABLE_VALUES_CACHE_KEY, cache);
+        }
+
+        Map<String, String> values = cache.get(cacheKey);
+        if (values == null) {
+            values = loadLocalVariableValues();
+            cache.put(cacheKey, values);
+        }
+        return values;
+    }
+
+    protected Map<String, String> loadLocalVariableValues() {
+        if (hasNode(VARIABLES_NODE_NAME)) {
+            JcrNode node = getNode(VARIABLES_NODE_NAME);
+            Map<String, String> result = new LinkedHashMap<String, String>();
+            JcrPropertyIterator i = node.getProperties();
+            while (i.hasNext()) {
+                JcrProperty property = i.nextProperty();
+                String name = property.getName();
+                // filter out jcr: properties (or other possible brix properties)
+                if (!name.contains(":")) {
+                    result.put(name, property.getString());
+                }
+            }
+            return Collections.unmodifiableMap(result);
+        } else {
+            return Collections.emptyMap();
+        }
+    }
+
+    private void invalidateLocalVariableValues() {
+        String cacheKey = getVariableValuesCacheKey();
+        if (cacheKey == null) {
+            return;
+        }
+
+        RequestCycle cycle = RequestCycle.get();
+        if (cycle == null) {
+            return;
+        }
+
+        Map<String, Map<String, String>> cache = cycle.getMetaData(VARIABLE_VALUES_CACHE_KEY);
+        if (cache != null) {
+            cache.remove(cacheKey);
+        }
+    }
+
+    private String getVariableValuesCacheKey() {
+        if (!isNodeType("mix:referenceable")) {
+            return null;
+        }
+        return getSession().getWorkspace().getName() + ":" + getIdentifier();
     }
 
     private static class Properties {

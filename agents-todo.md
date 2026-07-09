@@ -19,13 +19,3 @@ The file hash cache trusts a cached digest when the binary length is unchanged. 
 - Cover same-length replacement and legacy resource metadata in tests.
 
 Relevant code: `brix-core/src/main/java/org/brixcms/web/nodepage/BrixFileNode.java` and `brix-core/src/main/java/org/brixcms/web/resource/ResourceNodeHandler.java`.
-
-## P2 - Preserve the character encoding of uploaded text resources
-
-Uploaded `text/*` resources are stored without an encoding property, while delivery adds UTF-8 as the default charset. A non-UTF-8 upload can therefore be declared as UTF-8 and render incorrectly in a browser.
-
-- Store an explicit encoding when it is known, especially for editor-created text.
-- Only append a charset when the encoding is reliable, or define a clear conversion policy at upload time.
-- Add coverage for a non-UTF-8 text resource.
-
-Relevant code: `brix-core/src/main/java/org/brixcms/web/genericpage/UploadResourcesPanel.java`, `brix-core/src/main/java/org/brixcms/web/nodepage/BrixFileNode.java`, and `brix-core/src/main/java/org/brixcms/web/resource/ResourceNodeHandler.java`.

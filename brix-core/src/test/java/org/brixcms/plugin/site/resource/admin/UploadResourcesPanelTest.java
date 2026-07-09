@@ -14,6 +14,8 @@
 
 package org.brixcms.plugin.site.resource.admin;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -30,6 +32,22 @@ import org.easymock.EasyMock;
 import org.junit.Test;
 
 public class UploadResourcesPanelTest {
+    @Test
+    public void resolveUploadEncodingKeepsDeclaredCharsetForTextUpload() {
+        assertEquals("windows-1252", UploadResourcesPanel.resolveUploadEncoding(
+                "text/css; charset=windows-1252"));
+        assertEquals("UTF-8", UploadResourcesPanel.resolveUploadEncoding(
+                "text/plain; charset=\"utf8\""));
+    }
+
+    @Test
+    public void resolveUploadEncodingIgnoresUnknownCharsetAndBinaryUploads() {
+        assertNull(UploadResourcesPanel.resolveUploadEncoding(null));
+        assertNull(UploadResourcesPanel.resolveUploadEncoding("text/css"));
+        assertNull(UploadResourcesPanel.resolveUploadEncoding("text/css; charset=not-a-charset"));
+        assertNull(UploadResourcesPanel.resolveUploadEncoding("image/png; charset=UTF-8"));
+    }
+
     @Test
     public void createUploadBinaryClosesTheUploadStreamAfterSuccess() throws Exception {
         CloseTrackingInputStream input = new CloseTrackingInputStream();

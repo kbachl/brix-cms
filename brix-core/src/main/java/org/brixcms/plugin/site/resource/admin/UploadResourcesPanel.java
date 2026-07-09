@@ -17,6 +17,7 @@ package org.brixcms.plugin.site.resource.admin;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Serializable;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -37,6 +38,7 @@ import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.SimpleCallback;
 import org.brixcms.plugin.site.SitePlugin;
 import org.brixcms.plugin.site.admin.NodeManagerPanel;
+import org.brixcms.plugin.site.resource.ResourceNodePlugin;
 import org.brixcms.web.ContainerFeedbackPanel;
 
 public class UploadResourcesPanel extends NodeManagerPanel {
@@ -95,6 +97,10 @@ public class UploadResourcesPanel extends NodeManagerPanel {
 
             BrixFileNode file = BrixFileNode.initialize(newNode, mime);
             file.setData(createUploadBinary(upload, file.getSession().getValueFactory()));
+            String encoding = resolveUploadEncoding(mime);
+            if (encoding != null) {
+                file.setEncoding(encoding);
+            }
             file.getParent().save();
         }
 
@@ -110,6 +116,33 @@ public class UploadResourcesPanel extends NodeManagerPanel {
         } finally {
             upload.closeStreams();
         }
+    }
+
+    static String resolveUploadEncoding(String contentType) {
+        if (contentType == null || !BrixFileNode.isText(ResourceNodePlugin.normalizeMimeType(contentType))) {
+            return null;
+        }
+
+        String[] parameters = contentType.split(";");
+        for (int i = 1; i < parameters.length; i++) {
+            String parameter = parameters[i].trim();
+            int equals = parameter.indexOf('=');
+            if (equals < 0 || !"charset".equalsIgnoreCase(parameter.substring(0, equals).trim())) {
+                continue;
+            }
+
+            String encoding = parameter.substring(equals + 1).trim();
+            if (encoding.length() >= 2 && encoding.charAt(0) == '"'
+                    && encoding.charAt(encoding.length() - 1) == '"') {
+                encoding = encoding.substring(1, encoding.length() - 1);
+            }
+            try {
+                return Charset.forName(encoding).name();
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     @Override

@@ -146,7 +146,7 @@ public class ResourceNodeHandlerTest {
         assertEquals("text/javascript; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("application/x-javascript", "UTF-8"));
         assertEquals("text/javascript; charset=UTF-8",
-                ResourceNodeHandler.normalizeContentType("application/javascript", null));
+                ResourceNodeHandler.normalizeContentType("application/javascript", "UTF-8"));
         assertEquals("text/javascript; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("application/ecmascript", "UTF-8"));
         assertEquals("text/javascript; charset=UTF-8",
@@ -187,9 +187,22 @@ public class ResourceNodeHandlerTest {
     }
 
     @Test
+    public void textCssGetsItsPersistedNonUtf8Charset() {
+        assertEquals("text/css; charset=windows-1252",
+                ResourceNodeHandler.normalizeContentType("text/css", "windows-1252"));
+    }
+
+    @Test
     public void applicationXmlGetsCharset() {
         assertEquals("application/xml; charset=UTF-8",
                 ResourceNodeHandler.normalizeContentType("application/xml", "UTF-8"));
+    }
+
+    @Test
+    public void textTypesWithoutKnownEncodingDoNotGetCharset() {
+        assertEquals("text/css", ResourceNodeHandler.normalizeContentType("text/css", null));
+        assertEquals("text/javascript", ResourceNodeHandler.normalizeContentType("application/javascript", null));
+        assertEquals("application/xml", ResourceNodeHandler.normalizeContentType("application/xml", null));
     }
 
     @Test

@@ -147,7 +147,7 @@ public class ResourceNodeHandler implements IRequestHandler {
 	/**
 	 * Resolves the served {@code Content-Type} for the resource, normalizing it so browsers decode it
 	 * correctly: legacy JavaScript MIME types are mapped to {@code text/javascript} (RFC 9239) and
-	 * text-based types announce their charset (UTF-8 for text content stored by Brix).
+	 * text-based types announce their persisted charset when Brix has reliable encoding metadata.
 	 */
 	private static String resolveContentType(BrixFileNode node) {
 		String mimeType = null;
@@ -174,9 +174,8 @@ public class ResourceNodeHandler implements IRequestHandler {
 	 *         {@code application/x-javascript}, ECMAScript variants) are replaced with the modern
 	 *         standard {@code text/javascript} (RFC 9239). This also fixes already-stored legacy
 	 *         {@code jcr:mimeType} values without requiring a data migration.</li>
-	 *     <li>Text-based types get a {@code charset} parameter when they do not already carry one, so the
-	 *         browser decodes them as UTF-8 instead of guessing a platform default and rendering mojibake.
-	 *         An explicitly declared charset is preserved.</li>
+	 *     <li>Text-based types get a {@code charset} parameter when they have a known encoding and do not
+	 *         already carry one. An explicitly declared charset is preserved.</li>
 	 * </ol>
 	 * {@code application/json} is UTF-8 by spec (RFC 8259) and must not carry a charset parameter.
 	 */
@@ -189,9 +188,8 @@ public class ResourceNodeHandler implements IRequestHandler {
 			mimeType = replaceBase(mimeType, "text/javascript");
 			base = "text/javascript";
 		}
-		if (needsCharset(base) && !hasCharsetParam(mimeType)) {
-			String charset = Strings.isEmpty(encoding) ? "UTF-8" : encoding;
-			mimeType = mimeType + "; charset=" + charset;
+		if (needsCharset(base) && !hasCharsetParam(mimeType) && !Strings.isEmpty(encoding)) {
+			mimeType = mimeType + "; charset=" + encoding;
 		}
 		return mimeType;
 	}
@@ -216,9 +214,9 @@ public class ResourceNodeHandler implements IRequestHandler {
 				return encoding;
 			}
 		} catch (RuntimeException e) {
-			log.debug("Unable to read resource encoding for {}, defaulting to UTF-8", node.getPath(), e);
+			log.debug("Unable to read resource encoding for {}, omitting charset", node.getPath(), e);
 		}
-		return "UTF-8";
+		return null;
 	}
 
 	private static Date resolveLastModified(BrixFileNode node) {

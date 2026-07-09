@@ -14,14 +14,13 @@
 
 package org.brixcms.plugin.site.resource.admin;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.UUID;
+
+import javax.jcr.Binary;
 
 import org.apache.wicket.markup.html.form.CheckBox;
 import org.apache.wicket.markup.html.form.Form;
@@ -32,8 +31,7 @@ import org.apache.wicket.markup.html.link.Link;
 import org.apache.wicket.model.CompoundPropertyModel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
-import org.apache.wicket.util.io.Streams;
-import org.brixcms.Brix;
+import org.brixcms.jcr.api.JcrValueFactory;
 import org.brixcms.jcr.wrapper.BrixFileNode;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.SimpleCallback;
@@ -93,27 +91,25 @@ public class UploadResourcesPanel extends NodeManagerPanel {
 
             BrixNode newNode = (BrixNode) parentNode.addNode(fileName, "nt:file");
 
-            try {
-                // copy the upload into a temp file and assign that
-                // output stream to the node
-                File temp = File.createTempFile(
-                        Brix.NS + "-upload-" + UUID.randomUUID().toString(), null);
+            String mime = upload.getContentType();
 
-                Streams.copy(upload.getInputStream(), new FileOutputStream(temp));
-                upload.closeStreams();
-
-                String mime = upload.getContentType();
-
-                BrixFileNode file = BrixFileNode.initialize(newNode, mime);
-                file.setData(file.getSession().getValueFactory().createBinary(new FileInputStream(temp)));
-                file.getParent().save();
-            } catch (IOException e) {
-                throw new IllegalStateException(e);
-            }
+            BrixFileNode file = BrixFileNode.initialize(newNode, mime);
+            file.setData(createUploadBinary(upload, file.getSession().getValueFactory()));
+            file.getParent().save();
         }
 
 
         SitePlugin.get().selectNode(this, parentNode, true);
+    }
+
+    static Binary createUploadBinary(FileUpload upload, JcrValueFactory valueFactory) {
+        try (InputStream input = upload.getInputStream()) {
+            return valueFactory.createBinary(input);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } finally {
+            upload.closeStreams();
+        }
     }
 
     @Override

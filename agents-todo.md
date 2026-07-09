@@ -11,16 +11,6 @@ Both publishing and snapshot restore remove the target workspace content before 
 
 Relevant code: `brix-core/src/main/java/org/brixcms/Brix.java`, `brix-plugin-publish/src/main/java/org/brixcms/plugin/publish/PublishingPlugin.java`, and `brix-plugin-snapshot/src/main/java/org/brixcms/plugin/snapshot/web/ManageSnapshotsPanel.java`.
 
-## P2 - Remove temporary files created during resource uploads
-
-Resource upload creates a temporary file for each upload and does not delete it after storing the binary in JCR. Repeated uploads can fill the server temporary directory and eventually cause user-visible upload failures. The involved streams should also be closed deterministically.
-
-- Use try-with-resources for the upload and temporary-file streams.
-- Delete the temporary file in a finally block, including failures.
-- Add a regression test or integration-level cleanup check.
-
-Relevant code: `brix-core/src/main/java/org/brixcms/web/genericpage/UploadResourcesPanel.java`.
-
 ## P2 - Prevent stale ETags after same-length resource replacements
 
 The file hash cache trusts a cached digest when the binary length is unchanged. External JCR or XML updates that replace a resource with different bytes of the same length can retain the old ETag. Browsers and intermediaries may then receive a false `304 Not Modified` response and continue showing an old asset.

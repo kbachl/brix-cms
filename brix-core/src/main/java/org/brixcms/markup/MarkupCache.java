@@ -18,9 +18,9 @@ import org.apache.wicket.MarkupContainer;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.web.generic.IGenericComponent;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 /**
  * Contains {@link GeneratedMarkup} instances associated with {@link MarkupContainer}s. The {@link MarkupContainer}s
@@ -30,7 +30,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Matej Knopp
  */
 public class MarkupCache {
-    private final Map<CacheKey, GeneratedMarkup> map = new ConcurrentHashMap<CacheKey, GeneratedMarkup>();
+    private final ConcurrentMap<String, ConcurrentMap<CacheKey, GeneratedMarkup>> workspaceCaches =
+            new ConcurrentHashMap<String, ConcurrentMap<CacheKey, GeneratedMarkup>>();
 
     /**
      * Returns the {@link GeneratedMarkup} instance for given container. The container must implement {@link
@@ -44,8 +45,11 @@ public class MarkupCache {
             throw new IllegalArgumentException("Argument 'container' must implement MarkupSourceProvider");
         }
         MarkupSourceProvider provider = (MarkupSourceProvider) container;
-        final CacheKey key = getKey(container);
-        return map.computeIfAbsent(key, ignored -> new GeneratedMarkup(provider.getMarkupSource()));
+        BrixNode node = container.getModelObject();
+        String workspace = node.getSession().getWorkspace().getName();
+        ConcurrentMap<CacheKey, GeneratedMarkup> cache = getWorkspaceCache(workspace);
+        CacheKey key = getKey(container, node);
+        return cache.computeIfAbsent(key, ignored -> new GeneratedMarkup(provider.getMarkupSource()));
     }
 
     public void invalidate(BrixNode node) {
@@ -61,12 +65,17 @@ public class MarkupCache {
         if (workspace == null || nodeId == null) {
             return;
         }
-        map.keySet().removeIf(key -> workspace.equals(key.workspace) && nodeId.equals(key.nodeId));
+        ConcurrentMap<CacheKey, GeneratedMarkup> cache = workspaceCaches.get(workspace);
+        if (cache != null) {
+            cache.keySet().removeIf(key -> nodeId.equals(key.nodeId));
+        }
     }
 
     /**
-     * Removes all generated markup for a workspace. Use this after replacing workspace content through a JCR clone or
-     * XML import, because those operations do not emit the node save events used for regular invalidation.
+     * Detaches all generated markup for a workspace. Use this after replacing workspace content through a JCR clone
+     * or XML import, because those operations do not emit the node save events used for regular invalidation. Markup
+     * generation already in progress can only populate the detached cache and is therefore not visible to later
+     * requests.
      *
      * @param workspace workspace whose markup should be discarded
      */
@@ -74,23 +83,27 @@ public class MarkupCache {
         if (workspace == null) {
             return;
         }
-        map.keySet().removeIf(key -> workspace.equals(key.workspace));
+        workspaceCaches.remove(workspace);
+    }
+
+    private ConcurrentMap<CacheKey, GeneratedMarkup> getWorkspaceCache(String workspace) {
+        return workspaceCaches.computeIfAbsent(workspace,
+                ignored -> new ConcurrentHashMap<CacheKey, GeneratedMarkup>());
     }
 
     /**
-     * Returns the string representation of cache key for the given container.
+     * Returns the cache key for the given container within its workspace bucket.
      *
      * @param container
+     * @param node
      * @return
      */
-    private CacheKey getKey(IGenericComponent<BrixNode> container) {
-        BrixNode node = container.getModelObject();
+    private CacheKey getKey(IGenericComponent<BrixNode> container, BrixNode node) {
         String nodeId = "";
         if (node != null) {
             nodeId = getNodeId(node);
         }
-        String workspace = node.getSession().getWorkspace().getName();
-        return new CacheKey(container.getClass().getName(), workspace, nodeId);
+        return new CacheKey(container.getClass().getName(), nodeId);
     }
 
     private String getNodeId(BrixNode node) {
@@ -102,12 +115,10 @@ public class MarkupCache {
 
     private static class CacheKey {
         private final String componentClass;
-        private final String workspace;
         private final String nodeId;
 
-        private CacheKey(String componentClass, String workspace, String nodeId) {
+        private CacheKey(String componentClass, String nodeId) {
             this.componentClass = componentClass;
-            this.workspace = workspace;
             this.nodeId = nodeId;
         }
 
@@ -121,13 +132,12 @@ public class MarkupCache {
             }
             CacheKey key = (CacheKey) other;
             return Objects.equals(componentClass, key.componentClass)
-                    && Objects.equals(workspace, key.workspace)
                     && Objects.equals(nodeId, key.nodeId);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(componentClass, workspace, nodeId);
+            return Objects.hash(componentClass, nodeId);
         }
     }
 }

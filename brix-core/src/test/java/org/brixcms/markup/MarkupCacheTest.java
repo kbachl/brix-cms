@@ -15,8 +15,16 @@
 package org.brixcms.markup;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import javax.jcr.Node;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.wicket.model.IModel;
 import org.brixcms.Brix;
@@ -48,6 +56,43 @@ public class MarkupCacheTest {
 
         assertEquals(2, productionSource.generatedMarkupCount);
         assertEquals(1, developmentSource.generatedMarkupCount);
+    }
+
+    @Test
+    public void invalidateWorkspaceDetachesAnInFlightMarkupPopulation() throws Exception {
+        MarkupCache cache = new MarkupCache();
+        BlockingMarkupSource oldSource = new BlockingMarkupSource();
+        TestComponent oldComponent = new TestComponent(nodeInWorkspace("production", "page-id"), oldSource);
+        AtomicReference<GeneratedMarkup> oldMarkup = new AtomicReference<GeneratedMarkup>();
+        AtomicReference<Throwable> failure = new AtomicReference<Throwable>();
+        Thread oldRequest = new Thread(() -> {
+            try {
+                oldMarkup.set(cache.getMarkup(oldComponent));
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        }, "markup-cache-old-request");
+
+        oldRequest.start();
+        try {
+            assertTrue("old markup generation did not start", oldSource.generationStarted.await(5, TimeUnit.SECONDS));
+            cache.invalidateWorkspace("production");
+        } finally {
+            oldSource.continueGeneration.countDown();
+        }
+        oldRequest.join(TimeUnit.SECONDS.toMillis(5));
+
+        assertFalse("old markup generation did not finish", oldRequest.isAlive());
+        assertNull(failure.get());
+        assertNotNull(oldMarkup.get());
+
+        TestMarkupSource currentSource = new TestMarkupSource();
+        GeneratedMarkup currentMarkup = cache.getMarkup(
+                new TestComponent(nodeInWorkspace("production", "page-id"), currentSource));
+
+        assertEquals(1, oldSource.generatedMarkupCount);
+        assertEquals(1, currentSource.generatedMarkupCount);
+        assertNotSame(oldMarkup.get(), currentMarkup);
     }
 
     @Test
@@ -160,7 +205,7 @@ public class MarkupCacheTest {
     }
 
     private static class TestMarkupSource implements MarkupSource {
-        private int generatedMarkupCount;
+        protected int generatedMarkupCount;
 
         @Override
         public String getDoctype() {
@@ -181,6 +226,26 @@ public class MarkupCacheTest {
         @Override
         public Item nextMarkupItem() {
             return null;
+        }
+    }
+
+    private static class BlockingMarkupSource extends TestMarkupSource {
+        private final CountDownLatch generationStarted = new CountDownLatch(1);
+        private final CountDownLatch continueGeneration = new CountDownLatch(1);
+
+        @Override
+        public Object getExpirationToken() {
+            generatedMarkupCount++;
+            generationStarted.countDown();
+            try {
+                if (!continueGeneration.await(5, TimeUnit.SECONDS)) {
+                    throw new AssertionError("markup generation was not released");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AssertionError(e);
+            }
+            return new Object();
         }
     }
 }

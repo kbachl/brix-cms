@@ -19,6 +19,7 @@ import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.web.generic.IGenericComponent;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -29,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Matej Knopp
  */
 public class MarkupCache {
-    private Map<String, GeneratedMarkup> map = new ConcurrentHashMap<String, GeneratedMarkup>();
+    private final Map<CacheKey, GeneratedMarkup> map = new ConcurrentHashMap<CacheKey, GeneratedMarkup>();
 
     /**
      * Returns the {@link GeneratedMarkup} instance for given container. The container must implement {@link
@@ -43,7 +44,7 @@ public class MarkupCache {
             throw new IllegalArgumentException("Argument 'container' must implement MarkupSourceProvider");
         }
         MarkupSourceProvider provider = (MarkupSourceProvider) container;
-        final String key = getKey(container);
+        final CacheKey key = getKey(container);
         return map.computeIfAbsent(key, ignored -> new GeneratedMarkup(provider.getMarkupSource()));
     }
 
@@ -60,12 +61,20 @@ public class MarkupCache {
         if (workspace == null || nodeId == null) {
             return;
         }
-        String suffix = "-" + workspace + "-" + nodeId;
-        for (String key : map.keySet()) {
-            if (key.endsWith(suffix)) {
-                map.remove(key);
-            }
+        map.keySet().removeIf(key -> workspace.equals(key.workspace) && nodeId.equals(key.nodeId));
+    }
+
+    /**
+     * Removes all generated markup for a workspace. Use this after replacing workspace content through a JCR clone or
+     * XML import, because those operations do not emit the node save events used for regular invalidation.
+     *
+     * @param workspace workspace whose markup should be discarded
+     */
+    public void invalidateWorkspace(String workspace) {
+        if (workspace == null) {
+            return;
         }
+        map.keySet().removeIf(key -> workspace.equals(key.workspace));
     }
 
     /**
@@ -74,14 +83,14 @@ public class MarkupCache {
      * @param container
      * @return
      */
-    private String getKey(IGenericComponent<BrixNode> container) {
+    private CacheKey getKey(IGenericComponent<BrixNode> container) {
         BrixNode node = container.getModelObject();
         String nodeId = "";
         if (node != null) {
             nodeId = getNodeId(node);
         }
         String workspace = node.getSession().getWorkspace().getName();
-        return container.getClass().getName() + "-" + workspace + "-" + nodeId;
+        return new CacheKey(container.getClass().getName(), workspace, nodeId);
     }
 
     private String getNodeId(BrixNode node) {
@@ -89,5 +98,36 @@ public class MarkupCache {
             return node.getIdentifier();
         }
         return node.getPath();
+    }
+
+    private static class CacheKey {
+        private final String componentClass;
+        private final String workspace;
+        private final String nodeId;
+
+        private CacheKey(String componentClass, String workspace, String nodeId) {
+            this.componentClass = componentClass;
+            this.workspace = workspace;
+            this.nodeId = nodeId;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof CacheKey)) {
+                return false;
+            }
+            CacheKey key = (CacheKey) other;
+            return Objects.equals(componentClass, key.componentClass)
+                    && Objects.equals(workspace, key.workspace)
+                    && Objects.equals(nodeId, key.nodeId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(componentClass, workspace, nodeId);
+        }
     }
 }

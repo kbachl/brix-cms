@@ -28,4 +28,4 @@ Recent commits use short, imperative sentences with context, often including ver
 - Screenshots or steps for UI/demo changes (brix-demo).
 
 ## Configuration & Security Notes
-Demo configuration lives under `brix-demo/src/main/webapp/WEB-INF` and Open Liberty settings under `brix-demo/src/main/liberty/config`. Do not commit secrets or real credentials; use sample configs and document any required local setup.
+Demo configuration lives under `brix-demo/src/main/webapp/WEB-INF` and Open Liberty settings under `brix-demo/src/main/liberty/config`. The `brix-demo` module is only for local development and must never be deployed or exposed outside a local environment. Do not commit secrets or real credentials; use sample configs and document any required local setup.

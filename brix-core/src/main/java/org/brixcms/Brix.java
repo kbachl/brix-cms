@@ -296,7 +296,26 @@ public abstract class Brix {
 
     public void clone(JcrSession src, JcrSession dest) {
         cleanWorkspace(dest);
-        cloneWorkspace(src, dest);
+        try {
+            cloneWorkspace(src, dest);
+        } finally {
+            invalidateMarkupCache(dest);
+        }
+    }
+
+    /**
+     * Discards rendered markup after workspace content has been replaced outside the normal node save path.
+     *
+     * @param session session for the replaced workspace
+     */
+    public void invalidateMarkupCache(JcrSession session) {
+        if (session == null) {
+            return;
+        }
+        SitePlugin sitePlugin = SitePlugin.get(this);
+        if (sitePlugin != null) {
+            sitePlugin.getMarkupCache().invalidateWorkspace(session.getWorkspace().getName());
+        }
     }
 
     public void cleanWorkspace(JcrSession session) {

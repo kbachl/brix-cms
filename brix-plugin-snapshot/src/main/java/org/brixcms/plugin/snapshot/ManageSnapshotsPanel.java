@@ -225,28 +225,31 @@ public class ManageSnapshotsPanel extends BrixGenericPanel<Workspace> {
                 List<FileUpload> uploadList = upload.getModelObject();
                 if (uploadList != null) {
                     for (FileUpload u : uploadList) {
+                        Brix brix = getBrix();
+                        JcrSession workspaceSession = null;
                         try {
                             InputStream s = u.getInputStream();
                             String id = ManageSnapshotsPanel.this.getModelObject().getId();
-                            Brix brix = getBrix();
-                            JcrSession session = brix.getCurrentSession(id);
+                            workspaceSession = brix.getCurrentSession(id);
 
-                            if (session.itemExists(brix.getRootPath())) {
-                                session.getItem(brix.getRootPath()).remove();
-                                session.save();
+                            if (workspaceSession.itemExists(brix.getRootPath())) {
+                                workspaceSession.getItem(brix.getRootPath()).remove();
+                                workspaceSession.save();
                             }
 
-                            session.getWorkspace().importXML("/", s,
+                            workspaceSession.getWorkspace().importXML("/", s,
                                     ImportUUIDBehavior.IMPORT_UUID_COLLISION_REMOVE_EXISTING);
 
-                            session.save();
+                            workspaceSession.save();
 
-                            brix.initWorkspace(ManageSnapshotsPanel.this.getModelObject(), session);
+                            brix.initWorkspace(ManageSnapshotsPanel.this.getModelObject(), workspaceSession);
 
                             getSession().info(ManageSnapshotsPanel.this.getString("restoreSuccessful"));
                         } catch (Exception e) {
                             log.error("Failed to restore workspace from uploaded snapshot", e);
                             throw new BrixException(e);
+                        } finally {
+                            brix.invalidateMarkupCache(workspaceSession);
                         }
                     }
                 }

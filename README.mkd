@@ -31,6 +31,8 @@ At its deepest abstraction, BRIX is not a standalone CMS, but rather a CMS frame
 Getting Started
 ---------------
 
+Building Brix requires Java 25 and Maven 3.6.3 or newer. Run `mvn clean install` from the repository root to build all modules and execute the test suite.
+
 - How to [run the demo](https://github.com/brix-cms/brix-cms/wiki/RunningTheDemo)
 - How to [create a custom tile](https://github.com/brix-cms/brix-cms/wiki/GuestBookTileTutorial)
 

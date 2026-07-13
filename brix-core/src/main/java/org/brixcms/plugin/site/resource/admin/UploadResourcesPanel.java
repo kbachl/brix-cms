@@ -96,7 +96,8 @@ public class UploadResourcesPanel extends NodeManagerPanel {
             String mime = upload.getContentType();
 
             BrixFileNode file = BrixFileNode.initialize(newNode, mime);
-            file.setData(createUploadBinary(upload, file.getSession().getValueFactory()));
+            Binary binary = createUploadBinary(upload, file.getSession().getValueFactory());
+            setUploadData(file, binary);
             String encoding = resolveUploadEncoding(mime);
             if (encoding != null) {
                 file.setEncoding(encoding);
@@ -115,6 +116,14 @@ public class UploadResourcesPanel extends NodeManagerPanel {
             throw new IllegalStateException(e);
         } finally {
             upload.closeStreams();
+        }
+    }
+
+    static void setUploadData(BrixFileNode file, Binary binary) {
+        try {
+            file.setData(binary);
+        } finally {
+            binary.dispose();
         }
     }
 

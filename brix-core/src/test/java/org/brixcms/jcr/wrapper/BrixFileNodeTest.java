@@ -24,9 +24,11 @@ import org.apache.jackrabbit.api.JackrabbitRepository;
 import org.apache.jackrabbit.core.RepositoryImpl;
 import org.apache.jackrabbit.core.config.RepositoryConfig;
 import org.brixcms.Brix;
+import org.brixcms.jcr.JcrEventListener;
 import org.brixcms.jcr.RepositoryUtil;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrSession;
+import org.brixcms.jcr.base.EventUtil;
 import org.junit.After;
 import org.junit.Test;
 
@@ -132,6 +134,60 @@ public class BrixFileNodeTest {
         assertEquals("hash must reflect the current content", file.calculateContentSha256(), recomputed);
         // After recompute the persisted length matches, so the property now holds the fresh value.
         assertEquals(recomputed, file.getContentSha256());
+    }
+
+    @Test
+    public void staleHashIsRejectedAfterSameLengthContentChange() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login();
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+
+        BrixFileNode file = BrixFileNode.initialize(node, "text/css");
+        file.setData("body");
+        root.save();
+
+        String stale = file.getContentSha256();
+
+        // Simulate a direct JCR write that bypasses BrixFileNode.setData(). The replacement deliberately
+        // has the same byte length, so length-only validation would accept the stale hash.
+        file.getNode("jcr:content").setProperty("jcr:data", "copy");
+        JcrEventListener listener = new JcrEventListener();
+        EventUtil.registerSaveEventListener(listener);
+        try {
+            EventUtil.raiseSaveEvent(root);
+            root.save();
+        } finally {
+            EventUtil.unregisterSaveEventListener(listener);
+        }
+
+        assertNull(file.getCachedContentSha256());
+        String recomputed = file.ensureContentSha256();
+
+        assertFalse("hash must change for a same-length replacement", stale.equals(recomputed));
+        assertEquals(file.calculateContentSha256(), recomputed);
+    }
+
+    @Test
+    public void legacyHashWithoutModificationRevisionIsRecomputed() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login();
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+
+        BrixFileNode file = BrixFileNode.initialize(node, "text/css");
+        file.setData("body");
+        root.save();
+        file.getProperty(Brix.NS_PREFIX + "contentSha256LastModified").remove();
+        root.save();
+
+        assertNull(file.getCachedContentSha256());
+        String recomputed = file.ensureContentSha256();
+
+        assertEquals(file.calculateContentSha256(), recomputed);
+        assertEquals(recomputed, file.getCachedContentSha256());
     }
 
     @Test

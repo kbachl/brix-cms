@@ -19,6 +19,7 @@ import org.brixcms.jcr.api.JcrNodeIterator;
 import org.brixcms.jcr.api.JcrProperty;
 import org.brixcms.jcr.base.SaveEvent;
 import org.brixcms.jcr.base.SaveEventListener;
+import org.brixcms.jcr.wrapper.BrixFileNode;
 import org.brixcms.jcr.wrapper.BrixNode;
 
 import javax.jcr.observation.Event;
@@ -41,6 +42,7 @@ public class JcrEventListener implements SaveEventListener {
     private void handleSaveEvent(SaveEvent event) {
         JcrNode node = event.getNode();
         touch(node);
+        touchContentRevision(node);
         if (node.getDepth() == 0 || node.isNodeType("nt:folder")) {
             // go through immediate children to determine if there are any
             // modified ones
@@ -49,14 +51,17 @@ public class JcrEventListener implements SaveEventListener {
                 JcrNode n = iterator.nextNode();
                 if (n.isModified() || n.isNew()) {
                     touch(n);
+                    touchContentRevision(n);
                 } else if (n.hasNode("jcr:content")) {
                     JcrNode content = n.getNode("jcr:content");
                     if (content.isModified() || content.isNew()) {
                         touch(n);
+                        touchContentRevision(n);
                     } else if (content.hasProperty("jcr:data")) {
                         JcrProperty data = content.getProperty("jcr:data");
                         if (data.isNew() || data.isModified()) {
                             touch(n);
+                            touchContentRevision(n);
                         }
                     }
                 }
@@ -67,6 +72,25 @@ public class JcrEventListener implements SaveEventListener {
     private void touch(JcrNode node) {
         if (node.isNodeType("nt:file") || node.isNodeType("nt:folder")) {
             new BrixNode(node.getDelegate(), node.getSession()).touch();
+        }
+    }
+
+    private void touchContentRevision(JcrNode node) {
+        if (!node.isNodeType("nt:file") || !node.hasNode("jcr:content")) {
+            return;
+        }
+        JcrNode content = node.getNode("jcr:content");
+        if (!content.hasProperty("jcr:data")) {
+            return;
+        }
+        JcrProperty data = content.getProperty("jcr:data");
+        if (!data.isNew() && !data.isModified()) {
+            return;
+        }
+        JcrProperty lastModified = content.hasProperty("jcr:lastModified")
+                ? content.getProperty("jcr:lastModified") : null;
+        if (lastModified == null || (!lastModified.isNew() && !lastModified.isModified())) {
+            new BrixFileNode(node.getDelegate(), node.getSession()).touchContentLastModified();
         }
     }
 }

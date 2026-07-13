@@ -24,10 +24,13 @@ import java.io.IOException;
 import java.io.InputStream;
 
 import javax.jcr.Binary;
+import javax.jcr.Node;
 
 import org.apache.commons.fileupload2.core.FileItem;
 import org.apache.wicket.markup.html.form.upload.FileUpload;
 import org.brixcms.jcr.api.JcrValueFactory;
+import org.brixcms.jcr.api.JcrSession;
+import org.brixcms.jcr.wrapper.BrixFileNode;
 import org.easymock.EasyMock;
 import org.junit.Test;
 
@@ -83,6 +86,38 @@ public class UploadResourcesPanelTest {
         throw new AssertionError("Expected binary creation to fail");
     }
 
+    @Test
+    public void setUploadDataDisposesBinaryAfterSuccess() {
+        TestFileNode file = new TestFileNode();
+        Binary binary = EasyMock.createMock(Binary.class);
+        binary.dispose();
+        EasyMock.replay(binary);
+
+        UploadResourcesPanel.setUploadData(file, binary);
+
+        assertSame(binary, file.data);
+        EasyMock.verify(binary);
+    }
+
+    @Test
+    public void setUploadDataDisposesBinaryWhenStorageFails() {
+        TestFileNode file = new TestFileNode();
+        file.failure = new IllegalStateException("storage failed");
+        Binary binary = EasyMock.createMock(Binary.class);
+        binary.dispose();
+        EasyMock.replay(binary);
+
+        try {
+            UploadResourcesPanel.setUploadData(file, binary);
+        } catch (IllegalStateException e) {
+            assertSame(file.failure, e);
+            EasyMock.verify(binary);
+            return;
+        }
+
+        throw new AssertionError("Expected storage to fail");
+    }
+
     @SuppressWarnings("rawtypes")
     private static FileItem uploadItem(InputStream input) throws IOException {
         FileItem item = EasyMock.createMock(FileItem.class);
@@ -102,6 +137,23 @@ public class UploadResourcesPanelTest {
         public void close() throws IOException {
             closed = true;
             super.close();
+        }
+    }
+
+    private static class TestFileNode extends BrixFileNode {
+        private Binary data;
+        private RuntimeException failure;
+
+        private TestFileNode() {
+            super(EasyMock.createNiceMock(Node.class), EasyMock.createNiceMock(JcrSession.class));
+        }
+
+        @Override
+        public void setData(Binary data) {
+            this.data = data;
+            if (failure != null) {
+                throw failure;
+            }
         }
     }
 }

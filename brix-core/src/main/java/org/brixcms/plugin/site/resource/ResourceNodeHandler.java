@@ -86,8 +86,8 @@ public class ResourceNodeHandler implements IRequestHandler {
 			}
 
 			// Use the already-persisted hash (if any) for the ETag and the conditional decision. This is
-			// cheap: it only reads the two hash properties and compares the stored length against the
-			// current content length - it never reads or hashes the binary and never persists anything.
+			// cheap: it only reads the hash metadata and compares the stored length and modification
+			// revision against the current resource - it never reads or hashes the binary or persists anything.
 			// When no up-to-date persisted hash exists yet, the ETag stays null and the conditional
 			// decision falls back to Last-Modified (and to "not modified == false" for If-None-Match,
 			// which is correct: without a server ETag there is nothing to match against).

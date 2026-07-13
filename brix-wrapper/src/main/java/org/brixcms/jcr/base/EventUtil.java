@@ -52,6 +52,10 @@ public class EventUtil {
         listeners.add(listener);
     }
 
+    public static void unregisterSaveEventListener(SaveEventListener listener) {
+        listeners.remove(listener);
+    }
+
     /**
      * Ensure that calling checkin and save on nodes within the session raises the save event.
      *

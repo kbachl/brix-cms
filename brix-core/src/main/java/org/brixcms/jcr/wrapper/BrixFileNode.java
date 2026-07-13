@@ -47,6 +47,8 @@ public class BrixFileNode extends BrixNode {
     private static final Logger log = LoggerFactory.getLogger(BrixFileNode.class);
     private static final String JCR_PROP_CONTENT_SHA256 = Brix.NS_PREFIX + "contentSha256";
     private static final String JCR_PROP_CONTENT_SHA256_LENGTH = Brix.NS_PREFIX + "contentSha256Length";
+    private static final String JCR_PROP_CONTENT_SHA256_LAST_MODIFIED =
+            Brix.NS_PREFIX + "contentSha256LastModified";
 
     /**
      * Returns if the node is a file node,
@@ -159,14 +161,14 @@ public class BrixFileNode extends BrixNode {
 
     /**
      * Returns the persisted SHA-256 of the current content if one is already stored and still matches
-     * the current content length, or {@code null} otherwise.
+     * the current content length and modification revision, or {@code null} otherwise.
      * <p>
      * Unlike {@link #ensureContentSha256()} this never reads or hashes the binary and never persists
-     * anything: it only reads the two hash properties and compares the stored length against the current
-     * content length. It is therefore cheap to call on every request - including conditional (304) and
-     * HEAD requests that will never stream a body - so the ETag/conditional decision can be made without
-     * touching the binary. When no up-to-date persisted hash exists yet the caller gets {@code null} and
-     * can decide whether hashing is warranted (e.g. only when actually sending a body).
+     * anything: it only reads the hash metadata and compares it against the current resource metadata. It
+     * is therefore cheap to call on every request - including conditional (304) and HEAD requests that
+     * will never stream a body - so the ETag/conditional decision can be made without touching the binary.
+     * When no up-to-date persisted hash exists yet the caller gets {@code null} and can decide whether
+     * hashing is warranted (e.g. only when actually sending a body).
      */
     public String getCachedContentSha256() {
         String hash = getContentSha256();
@@ -181,6 +183,9 @@ public class BrixFileNode extends BrixNode {
         if (hash != null && isPersistedHashForCurrentContent()) {
             return hash;
         }
+        if (getContentLastModified() == null) {
+            touchContentLastModified();
+        }
         long contentLength = getContentLength();
         hash = calculateContentSha256();
         setContentSha256(hash, contentLength);
@@ -192,26 +197,22 @@ public class BrixFileNode extends BrixNode {
      * Tells whether the persisted SHA-256 was computed for the content currently stored on this node.
      * <p>
      * Content can be replaced through paths that bypass {@link #setData} (for example an XML workspace
-     * import), which would otherwise leave a stale hash and therefore a stale ETag. Re-validating against
-     * the current content length detects such replacements without having to re-hash the binary on every
-     * request.
-     * <p>
-     * Known limitation (accepted trade-off): a replacement that changes the bytes but keeps the exact
-     * same length is not detected. Fully closing that would require re-hashing on every request (cost on
-     * the 304 hot path) or a JCR observation listener (extra complexity). It is out of scope because the
-     * realistic bypass here - whole-workspace XML import - carries a self-consistent jcr:data/hash pair.
-     * <p>
-     * Migration note: content hashed before the length property existed (pre-10.16.1) carries no length.
-     * Such nodes are trusted as-is rather than re-hashed on every request - only nodes that actually store
-     * a length are re-validated. Without this, every legacy resource would be re-hashed (and re-saved) on
-     * each body-serving request, which is a heavy regression when the serve path cannot persist the backfill.
+     * import), which would otherwise leave a stale hash and therefore a stale ETag. Re-validating both the
+     * content length and the resource's {@code jcr:lastModified} revision detects same-length replacements
+     * without having to re-hash the binary on every request. Legacy hashes without complete validation
+     * metadata are treated as stale and backfilled on the next body-serving request.
      */
     private boolean isPersistedHashForCurrentContent() {
         try {
-            if (!hasProperty(JCR_PROP_CONTENT_SHA256_LENGTH)) {
-                return true;
+            if (!hasProperty(JCR_PROP_CONTENT_SHA256_LENGTH)
+                    || !hasProperty(JCR_PROP_CONTENT_SHA256_LAST_MODIFIED)) {
+                return false;
             }
-            return getProperty(JCR_PROP_CONTENT_SHA256_LENGTH).getLong() == getContentLength();
+            Long contentLastModified = getContentLastModified();
+            return contentLastModified != null
+                    && getProperty(JCR_PROP_CONTENT_SHA256_LENGTH).getLong() == getContentLength()
+                    && getProperty(JCR_PROP_CONTENT_SHA256_LAST_MODIFIED).getLong()
+                    == contentLastModified.longValue();
         } catch (RuntimeException e) {
             return false;
         }
@@ -236,7 +237,34 @@ public class BrixFileNode extends BrixNode {
             }
             setProperty(JCR_PROP_CONTENT_SHA256, hash);
             setProperty(JCR_PROP_CONTENT_SHA256_LENGTH, contentLength);
+            Long contentLastModified = getContentLastModified();
+            if (contentLastModified != null) {
+                setProperty(JCR_PROP_CONTENT_SHA256_LAST_MODIFIED, contentLastModified.longValue());
+            }
         }
+    }
+
+    private Long getContentLastModified() {
+        JcrNode content = getContent();
+        if (!content.hasProperty("jcr:lastModified")) {
+            return null;
+        }
+        return content.getProperty("jcr:lastModified").getDate().getTimeInMillis();
+    }
+
+    /**
+     * Advances the revision used to validate the persisted content hash. The timestamp is guaranteed to
+     * increase even when two changes happen within the same millisecond.
+     */
+    public void touchContentLastModified() {
+        long timestamp = System.currentTimeMillis();
+        Long previous = getContentLastModified();
+        if (previous != null && timestamp <= previous.longValue()) {
+            timestamp = previous.longValue() + 1;
+        }
+        Calendar lastModified = Calendar.getInstance();
+        lastModified.setTimeInMillis(timestamp);
+        getContent().setProperty("jcr:lastModified", lastModified);
     }
 
     private void saveHashBestEffort() {
@@ -296,6 +324,7 @@ public class BrixFileNode extends BrixNode {
      */
     public void setData(Binary data) {
         getContent().setProperty("jcr:data", data);
+        touchContentLastModified();
         updateContentSha256();
     }
 
@@ -319,6 +348,7 @@ public class BrixFileNode extends BrixNode {
         }
         setEncoding("UTF-8");
         getContent().setProperty("jcr:data", data);
+        touchContentLastModified();
         updateContentSha256();
     }
 

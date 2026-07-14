@@ -58,11 +58,11 @@
 		<deployment.disabled>false</deployment.disabled>
 		<sources.disabled>false</sources.disabled>
 
-		<wicket.version>10.9.0</wicket.version>
-		<inmethod.grid.version>10.8.0</inmethod.grid.version>
+		<wicket.version>10.9.1</wicket.version>
+		<inmethod.grid.version>10.9.2</inmethod.grid.version>
 		<jetty.version>11.0.26</jetty.version>
 		<htmllexer.version>2.1</htmllexer.version>
-		<jackrabbit.version>2.22.2</jackrabbit.version>
+		<jackrabbit.version>2.22.3</jackrabbit.version>
 		<jackrabbit.oak-api.version>1.82.0</jackrabbit.oak-api.version>
 		<servlet-api.version>6.0.0</servlet-api.version>
 	</properties>
@@ -206,7 +206,7 @@
 			<dependency>
 				<groupId>com.thoughtworks.xstream</groupId>
 				<artifactId>xstream</artifactId>
-				<version>1.4.20</version>
+				<version>1.4.21</version>
 			</dependency>
 			<dependency>
 				<groupId>org.ogce</groupId>
@@ -264,22 +264,22 @@
 			<dependency>
 				<groupId>org.slf4j</groupId>
 				<artifactId>slf4j-api</artifactId>
-				<version>2.0.9</version>
+				<version>2.0.18</version>
 			</dependency>
 			<dependency>
 				<groupId>org.slf4j</groupId>
 				<artifactId>slf4j-reload4j</artifactId>
-				<version>2.0.9</version>
+				<version>2.0.18</version>
 			</dependency>
 			<dependency>
 				<groupId>org.slf4j</groupId>
 				<artifactId>jcl-over-slf4j</artifactId>
-				<version>2.0.9</version>
+				<version>2.0.18</version>
 			</dependency>
 			<dependency>
 				<groupId>org.apache.logging.log4j</groupId>
 				<artifactId>log4j-core</artifactId>
-				<version>2.20.0</version>
+				<version>2.26.1</version>
 			</dependency>
 
 			<!--+ | JETTY + -->
@@ -293,7 +293,7 @@
 			<dependency>
 				<groupId>junit</groupId>
 				<artifactId>junit</artifactId>
-				<version>4.13.1</version>
+				<version>4.13.2</version>
 				<scope>test</scope>
 			</dependency>
 			<dependency>

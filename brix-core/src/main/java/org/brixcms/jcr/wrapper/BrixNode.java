@@ -267,6 +267,8 @@ public class BrixNode extends NodeWrapper {
             addMixin(JCR_TYPE_BRIX_NODE);
         }
         setProperty(JCR_PROP_NODE_TYPE, type);
+        // Wrapper factories use this property as discriminator, so cached wrappers must be rebuilt.
+        getSession().clearIdentifierCache();
     }
 
     /**

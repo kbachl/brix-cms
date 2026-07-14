@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -84,6 +85,10 @@ public abstract class Brix {
 
     private static MetaDataKey<Brix> APP_KEY = new MetaDataKey<Brix>() {
     };
+
+    private static final MetaDataKey<Map<Brix, Map<Session, JcrSession>>> CURRENT_SESSION_CACHE_KEY =
+            new MetaDataKey<Map<Brix, Map<Session, JcrSession>>>() {
+            };
 
     private final BrixConfig config;
 
@@ -425,7 +430,29 @@ public abstract class Brix {
 
     public JcrSession getCurrentSession(String workspace) {
         Session session = config.getSessionFactory().getCurrentSession(workspace);
-        return wrapSession(session);
+        RequestCycle requestCycle = RequestCycle.get();
+        if (requestCycle == null || session == null) {
+            return wrapSession(session);
+        }
+
+        Map<Brix, Map<Session, JcrSession>> caches = requestCycle.getMetaData(CURRENT_SESSION_CACHE_KEY);
+        if (caches == null) {
+            caches = new IdentityHashMap<Brix, Map<Session, JcrSession>>();
+            requestCycle.setMetaData(CURRENT_SESSION_CACHE_KEY, caches);
+        }
+
+        Map<Session, JcrSession> cache = caches.get(this);
+        if (cache == null) {
+            cache = new IdentityHashMap<Session, JcrSession>();
+            caches.put(this, cache);
+        }
+
+        JcrSession wrapped = cache.get(session);
+        if (wrapped == null) {
+            wrapped = wrapSession(session);
+            cache.put(session, wrapped);
+        }
+        return wrapped;
     }
 
     public JcrSession wrapSession(Session session) {

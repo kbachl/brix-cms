@@ -70,6 +70,7 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
                 getDelegate().copy(srcAbsPath, destAbsPath);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void copy(final String srcWorkspace, final String srcAbsPath, final String destAbsPath) {
@@ -78,6 +79,7 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
                 getDelegate().copy(srcWorkspace, srcAbsPath, destAbsPath);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void clone(final String srcWorkspace, final String srcAbsPath, final String destAbsPath,
@@ -87,6 +89,7 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
                 getDelegate().clone(srcWorkspace, srcAbsPath, destAbsPath, removeExisting);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void move(final String srcAbsPath, final String destAbsPath) {
@@ -95,6 +98,7 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
                 getDelegate().move(srcAbsPath, destAbsPath);
             }
         });
+        invalidateIdentifierCache();
     }
 
     /**
@@ -107,6 +111,7 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
                 getDelegate().restore(versions, removeExisting);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public LockManager getLockManager() {
@@ -154,7 +159,7 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
     public VersionManager getVersionManager() {
         return executeCallback(new Callback<VersionManager>() {
             public VersionManager execute() throws Exception {
-                return getDelegate().getVersionManager();
+                return VersionManagerWrapper.wrap(getDelegate().getVersionManager(), getJcrSession());
             }
         });
     }
@@ -168,19 +173,24 @@ class WorkspaceWrapper extends AbstractWrapper implements JcrWorkspace {
     }
 
     public ContentHandler getImportContentHandler(final String parentAbsPath, final int uuidBehavior) {
-        return executeCallback(new Callback<ContentHandler>() {
+        ContentHandler handler = executeCallback(new Callback<ContentHandler>() {
             public ContentHandler execute() throws Exception {
                 return getDelegate().getImportContentHandler(parentAbsPath, uuidBehavior);
             }
         });
+        return IdentifierCacheInvalidatingContentHandler.wrap(handler, getJcrSession());
     }
 
     public void importXML(final String parentAbsPath, final InputStream in, final int uuidBehavior) {
-        executeCallback(new VoidCallback() {
-            public void execute() throws Exception {
-                getDelegate().importXML(parentAbsPath, in, uuidBehavior);
-            }
-        });
+        try {
+            executeCallback(new VoidCallback() {
+                public void execute() throws Exception {
+                    getDelegate().importXML(parentAbsPath, in, uuidBehavior);
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public void createWorkspace(final String name) {

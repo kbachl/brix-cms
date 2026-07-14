@@ -162,6 +162,7 @@ abstract class ItemWrapper extends AbstractWrapper implements JcrItem {
                 getDelegate().refresh(keepChanges);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void remove() {
@@ -170,6 +171,9 @@ abstract class ItemWrapper extends AbstractWrapper implements JcrItem {
                 getDelegate().remove();
             }
         });
+        if (this instanceof JcrNode node) {
+            getJcrSession().nodeRemoved(node);
+        }
     }
 
     public Item getDelegate() {

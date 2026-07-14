@@ -342,6 +342,13 @@ public interface JcrSession extends BrixSession {
      */
     public void nodeRemoved(JcrNode node);
 
+    /**
+     * Clears cached node wrappers after a session- or workspace-level content change. Implementations without an
+     * identifier cache may keep the default no-op behavior.
+     */
+    default void clearIdentifierCache() {
+    }
+
     public static class Wrapper {
         public static JcrSession wrap(Session delegate, Behavior behavior) {
             return WrapperAccessor.JcrSessionWrapper.wrap(delegate, behavior);

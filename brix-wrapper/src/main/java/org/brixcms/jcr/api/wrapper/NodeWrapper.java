@@ -96,20 +96,28 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
 
 
     public JcrNode addNode(final String relPath) {
-        return executeCallback(new Callback<JcrNode>() {
-            public JcrNode execute() throws Exception {
-                return JcrNode.Wrapper.wrap(getDelegate().addNode(relPath), getJcrSession());
-            }
-        });
+        try {
+            return executeCallback(new Callback<JcrNode>() {
+                public JcrNode execute() throws Exception {
+                    return JcrNode.Wrapper.wrap(getDelegate().addNode(relPath), getJcrSession());
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public JcrNode addNode(final String relPath, final String primaryNodeTypeName) {
-        return executeCallback(new Callback<JcrNode>() {
-            public JcrNode execute() throws Exception {
-                return JcrNode.Wrapper.wrap(getDelegate().addNode(relPath, primaryNodeTypeName),
-                        getJcrSession());
-            }
-        });
+        try {
+            return executeCallback(new Callback<JcrNode>() {
+                public JcrNode execute() throws Exception {
+                    return JcrNode.Wrapper.wrap(getDelegate().addNode(relPath, primaryNodeTypeName),
+                            getJcrSession());
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public void orderBefore(final String srcChildRelPath, final String destChildRelPath) {
@@ -467,27 +475,39 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
     }
 
     public void setPrimaryType(final String nodeTypeName) {
-        executeCallback(new VoidCallback() {
-            public void execute() throws Exception {
-                getDelegate().setPrimaryType(nodeTypeName);
-            }
-        });
+        try {
+            executeCallback(new VoidCallback() {
+                public void execute() throws Exception {
+                    getDelegate().setPrimaryType(nodeTypeName);
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public void addMixin(final String mixinName) {
-        executeCallback(new VoidCallback() {
-            public void execute() throws Exception {
-                getDelegate().addMixin(mixinName);
-            }
-        });
+        try {
+            executeCallback(new VoidCallback() {
+                public void execute() throws Exception {
+                    getDelegate().addMixin(mixinName);
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public void removeMixin(final String mixinName) {
-        executeCallback(new VoidCallback() {
-            public void execute() throws Exception {
-                getDelegate().removeMixin(mixinName);
-            }
-        });
+        try {
+            executeCallback(new VoidCallback() {
+                public void execute() throws Exception {
+                    getDelegate().removeMixin(mixinName);
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public boolean canAddMixin(final String mixinName) {
@@ -571,6 +591,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().update(srcWorkspaceName);
             }
         });
+        invalidateIdentifierCache();
     }
 
     /**
@@ -578,12 +599,14 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
      */
     @Deprecated
     public JcrNodeIterator merge(final String srcWorkspace, final boolean bestEffort) {
-        return executeCallback(new Callback<JcrNodeIterator>() {
+        JcrNodeIterator result = executeCallback(new Callback<JcrNodeIterator>() {
             public JcrNodeIterator execute() throws Exception {
                 return JcrNodeIterator.Wrapper.wrap(getDelegate().merge(srcWorkspace, bestEffort),
                         getJcrSession());
             }
         });
+        invalidateIdentifierCache();
+        return result;
     }
 
     public String getCorrespondingNodePath(final String workspaceName) {
@@ -608,6 +631,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().removeSharedSet();
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void removeShare() {
@@ -616,6 +640,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().removeShare();
             }
         });
+        invalidateIdentifierCache();
     }
 
     public boolean isCheckedOut() {
@@ -636,6 +661,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().restore(versionName, removeExisting);
             }
         });
+        invalidateIdentifierCache();
     }
 
     /**
@@ -648,6 +674,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().restore(unwrap(version), removeExisting);
             }
         });
+        invalidateIdentifierCache();
     }
 
     /**
@@ -660,6 +687,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().restore(unwrap(version), relPath, removeExisting);
             }
         });
+        invalidateIdentifierCache();
     }
 
     /**
@@ -672,6 +700,7 @@ public class NodeWrapper extends ItemWrapper implements JcrNode {
                 getDelegate().restoreByLabel(versionLabel, removeExisting);
             }
         });
+        invalidateIdentifierCache();
     }
 
     /**

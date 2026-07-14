@@ -45,7 +45,9 @@ import java.util.Map;
 class SessionWrapper extends AbstractWrapper implements JcrSession {
     private final Behavior behavior;
 
-    private Map<String, JcrNode> uuidMap = new HashMap<String, JcrNode>();
+    private final Map<String, JcrNode> uuidMap = new HashMap<>();
+
+    private int identifierCacheSuspensionCount;
 
     public static JcrSession wrap(Session delegate, Behavior behavior) {
         if (delegate == null) {
@@ -94,7 +96,29 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
     public void nodeRemoved(JcrNode node) {
         // it's not enough to just remove the node from UUID map, we are
         // removing the entire subtree
+        clearIdentifierCache();
+    }
+
+    @Override
+    public void clearIdentifierCache() {
         uuidMap.clear();
+    }
+
+    void suspendIdentifierCache() {
+        identifierCacheSuspensionCount++;
+        clearIdentifierCache();
+    }
+
+    void resumeIdentifierCache() {
+        if (identifierCacheSuspensionCount == 0) {
+            throw new IllegalStateException("Identifier cache is not suspended.");
+        }
+        identifierCacheSuspensionCount--;
+        clearIdentifierCache();
+    }
+
+    private boolean isIdentifierCacheEnabled() {
+        return identifierCacheSuspensionCount == 0;
     }
 
 
@@ -160,7 +184,7 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
      */
     @Deprecated
     public JcrNode getNodeByUUID(final String uuid) {
-        JcrNode result = uuidMap.get(uuid);
+        JcrNode result = isIdentifierCacheEnabled() ? uuidMap.get(uuid) : null;
         if (result == null) {
             result = executeCallback(new Callback<JcrNode>() {
                 public JcrNode execute() throws Exception {
@@ -168,13 +192,15 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
                     return JcrNode.Wrapper.wrap(node, getJcrSession());
                 }
             });
-            uuidMap.put(uuid, result);
+            if (isIdentifierCacheEnabled()) {
+                uuidMap.put(uuid, result);
+            }
         }
         return result;
     }
 
     public JcrNode getNodeByIdentifier(final String id) {
-        JcrNode result = uuidMap.get(id);
+        JcrNode result = isIdentifierCacheEnabled() ? uuidMap.get(id) : null;
         if (result == null) {
             result = executeCallback(new Callback<JcrNode>() {
                 public JcrNode execute() throws Exception {
@@ -182,7 +208,9 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
                     return JcrNode.Wrapper.wrap(node, getJcrSession());
                 }
             });
-            uuidMap.put(id, result);
+            if (isIdentifierCacheEnabled()) {
+                uuidMap.put(id, result);
+            }
         }
         return result;
     }
@@ -242,6 +270,7 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
                 getDelegate().move(srcAbsPath, destAbsPath);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void removeItem(final String absPath) {
@@ -250,6 +279,7 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
                 getDelegate().removeItem(absPath);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public void save() {
@@ -266,6 +296,7 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
                 getDelegate().refresh(keepChanges);
             }
         });
+        invalidateIdentifierCache();
     }
 
     public boolean hasPendingChanges() {
@@ -311,19 +342,24 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
     }
 
     public ContentHandler getImportContentHandler(final String parentAbsPath, final int uuidBehavior) {
-        return executeCallback(new Callback<ContentHandler>() {
+        ContentHandler handler = executeCallback(new Callback<ContentHandler>() {
             public ContentHandler execute() throws Exception {
                 return getDelegate().getImportContentHandler(parentAbsPath, uuidBehavior);
             }
         });
+        return IdentifierCacheInvalidatingContentHandler.wrap(handler, getJcrSession());
     }
 
     public void importXML(final String parentAbsPath, final InputStream in, final int uuidBehavior) {
-        executeCallback(new VoidCallback() {
-            public void execute() throws Exception {
-                getDelegate().importXML(parentAbsPath, in, uuidBehavior);
-            }
-        });
+        try {
+            executeCallback(new VoidCallback() {
+                public void execute() throws Exception {
+                    getDelegate().importXML(parentAbsPath, in, uuidBehavior);
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public void exportSystemView(final String absPath, final ContentHandler contentHandler,
@@ -395,11 +431,15 @@ class SessionWrapper extends AbstractWrapper implements JcrSession {
     }
 
     public void logout() {
-        executeCallback(new VoidCallback() {
-            public void execute() throws Exception {
-                getDelegate().logout();
-            }
-        });
+        try {
+            executeCallback(new VoidCallback() {
+                public void execute() throws Exception {
+                    getDelegate().logout();
+                }
+            });
+        } finally {
+            invalidateIdentifierCache();
+        }
     }
 
     public boolean isLive() {

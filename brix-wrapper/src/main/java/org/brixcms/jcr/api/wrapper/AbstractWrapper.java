@@ -103,6 +103,13 @@ abstract class AbstractWrapper {
         return session;
     }
 
+    protected void invalidateIdentifierCache() {
+        JcrSession currentSession = getJcrSession();
+        if (currentSession != null) {
+            currentSession.clearIdentifierCache();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     protected <T> T unwrap(T wrapper) {
         while (wrapper instanceof AbstractWrapper) {

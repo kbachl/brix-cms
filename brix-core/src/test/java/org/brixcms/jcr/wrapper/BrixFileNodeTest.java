@@ -24,8 +24,11 @@ import org.apache.jackrabbit.api.JackrabbitRepository;
 import org.apache.jackrabbit.core.RepositoryImpl;
 import org.apache.jackrabbit.core.config.RepositoryConfig;
 import org.brixcms.Brix;
+import org.brixcms.auth.AuthorizationStrategy;
+import org.brixcms.config.BrixConfig;
 import org.brixcms.jcr.JcrEventListener;
 import org.brixcms.jcr.RepositoryUtil;
+import org.brixcms.jcr.SessionBehavior;
 import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.jcr.base.EventUtil;
@@ -106,6 +109,24 @@ public class BrixFileNodeTest {
         assertTrue(file.isNodeType(BrixNode.JCR_TYPE_BRIX_NODE));
         assertEquals("230d8358dc8e8890b4c58deeb62912ee2f20357ae92a5cc861b98e68fe31acb5",
                 file.getContentSha256());
+    }
+
+    @Test
+    public void initializeReloadsCachedFileWithResourceWrapper() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login(new SessionBehavior(new TestBrix()));
+        JcrNode root = session.getRootNode().addNode("root", "nt:folder");
+        JcrNode node = root.addNode("asset.css", "nt:file");
+        node.addMixin("mix:referenceable");
+        String identifier = node.getIdentifier();
+        JcrNode beforeInitialize = session.getNodeByIdentifier(identifier);
+
+        assertFalse(beforeInitialize instanceof BrixFileNode);
+        BrixFileNode.initialize(beforeInitialize, "text/css");
+        JcrNode afterInitialize = session.getNodeByIdentifier(identifier);
+
+        assertTrue(afterInitialize instanceof ResourceNode);
     }
 
     @Test
@@ -258,9 +279,24 @@ public class BrixFileNodeTest {
     }
 
     private JcrSession login() throws RepositoryException {
-        JcrSession session = JcrSession.Wrapper.wrap(repo.login(credentials()));
+        return login(null);
+    }
+
+    private JcrSession login(JcrSession.Behavior behavior) throws RepositoryException {
+        JcrSession session = JcrSession.Wrapper.wrap(repo.login(credentials()), behavior);
         sessions.add(session);
         return session;
+    }
+
+    private static class TestBrix extends Brix {
+        private TestBrix() {
+            super(new BrixConfig(null, null, null));
+        }
+
+        @Override
+        public AuthorizationStrategy newAuthorizationStrategy() {
+            return null;
+        }
     }
 
     private static Credentials credentials() {

@@ -26,6 +26,10 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Contains common and convenience Workspace Manager methods.
@@ -33,6 +37,8 @@ import java.util.UUID;
  * @author Matej Knopp
  */
 public abstract class AbstractWorkspaceManager implements WorkspaceManager {
+    private static final Logger log = LoggerFactory.getLogger(AbstractWorkspaceManager.class);
+
     protected static final String NODE_NAME = "brix:workspace";
 
     protected static final String NODE_PATH = "/" + NODE_NAME;
@@ -50,6 +56,31 @@ public abstract class AbstractWorkspaceManager implements WorkspaceManager {
     private Map<AttributeKeyAndValue, Set<String>> attributeToWorkspaceListMap = new HashMap<AttributeKeyAndValue, Set<String>>();
 
     private Map<String, Map<String, String>> workspaceToWorkspaceAttributesMap = new HashMap<String, Map<String, String>>();
+
+    private final CopyOnWriteArrayList<Listener> listeners = new CopyOnWriteArrayList<Listener>();
+
+    @Override
+    public void addListener(Listener listener) {
+        if (listener == null) {
+            throw new IllegalArgumentException("listener may not be null");
+        }
+        listeners.addIfAbsent(listener);
+    }
+
+    @Override
+    public void removeListener(Listener listener) {
+        listeners.remove(listener);
+    }
+
+    private void notifyWorkspaceDeleted(String workspaceId) {
+        for (Listener listener : listeners) {
+            try {
+                listener.workspaceDeleted(workspaceId);
+            } catch (RuntimeException e) {
+                log.warn("Workspace deletion listener failed for {}", workspaceId, e);
+            }
+        }
+    }
 
 
     public synchronized List<Workspace> getWorkspacesFiltered(
@@ -310,6 +341,7 @@ public abstract class AbstractWorkspaceManager implements WorkspaceManager {
         public void delete() {
             try {
                 AbstractWorkspaceManager.this.delete(getId());
+                notifyWorkspaceDeleted(getId());
             } catch (RepositoryException e) {
                 throw new JcrException(e);
             }

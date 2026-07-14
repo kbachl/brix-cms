@@ -14,31 +14,18 @@
 
 package org.brixcms.util;
 
-import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public class ArrayIterator<T> implements Iterator<T> {
-    private int index = 0;
-    private final T[] array;
+import org.junit.Test;
 
-    public ArrayIterator(T[] array) {
-        super();
-        this.array = array;
-    }
+import static org.junit.Assert.assertEquals;
 
+public class ArrayIteratorTest {
+    @Test(expected = NoSuchElementException.class)
+    public void nextThrowsNoSuchElementExceptionWhenExhausted() {
+        ArrayIterator<String> iterator = new ArrayIterator<String>(new String[]{"value"});
 
-    public boolean hasNext() {
-        return index < array.length;
-    }
-
-    public T next() {
-        if (!hasNext()) {
-            throw new NoSuchElementException();
-        }
-        return array[index++];
-    }
-
-    public void remove() {
-        throw new UnsupportedOperationException();
+        assertEquals("value", iterator.next());
+        iterator.next();
     }
 }

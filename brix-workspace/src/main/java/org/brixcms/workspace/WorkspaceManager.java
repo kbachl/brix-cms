@@ -25,6 +25,29 @@ import java.util.Map;
  */
 public interface WorkspaceManager {
     /**
+     * Listener for workspace lifecycle changes.
+     */
+    interface Listener {
+        void workspaceDeleted(String workspaceId);
+    }
+
+    /**
+     * Registers a listener. Implementations predating lifecycle notifications may keep the default no-op behavior.
+     *
+     * @param listener listener to register
+     */
+    default void addListener(Listener listener) {
+    }
+
+    /**
+     * Removes a previously registered listener.
+     *
+     * @param listener listener to remove
+     */
+    default void removeListener(Listener listener) {
+    }
+
+    /**
      * Creates a new workspace.
      *
      * @return

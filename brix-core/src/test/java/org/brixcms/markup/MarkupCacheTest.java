@@ -22,6 +22,9 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import javax.jcr.Node;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +39,8 @@ import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.markup.tag.Item;
 import org.brixcms.plugin.site.SitePlugin;
 import org.brixcms.web.generic.IGenericComponent;
+import org.brixcms.workspace.Workspace;
+import org.brixcms.workspace.WorkspaceManager;
 import org.easymock.EasyMock;
 import org.junit.Test;
 
@@ -123,6 +128,21 @@ public class MarkupCacheTest {
         EasyMock.verify(sourceSession, destinationSession, sourceWorkspace, destinationWorkspace);
     }
 
+    @Test
+    public void workspaceDeletionInvalidatesMarkupForThatWorkspace() {
+        TestWorkspaceManager workspaceManager = new TestWorkspaceManager();
+        TestBrix brix = new TestBrix(workspaceManager);
+        MarkupCache cache = SitePlugin.get(brix).getMarkupCache();
+        TestMarkupSource markupSource = new TestMarkupSource();
+        TestComponent component = new TestComponent(nodeInWorkspace("production", "page-id"), markupSource);
+        cache.getMarkup(component);
+
+        workspaceManager.notifyWorkspaceDeleted("production");
+        cache.getMarkup(component);
+
+        assertEquals(2, markupSource.generatedMarkupCount);
+    }
+
     private static BrixNode nodeInWorkspace(String workspaceName, String identifier) {
         JcrSession session = EasyMock.createMock(JcrSession.class);
         JcrWorkspace workspace = EasyMock.createMock(JcrWorkspace.class);
@@ -134,12 +154,54 @@ public class MarkupCacheTest {
 
     private static class TestBrix extends Brix {
         private TestBrix() {
-            super(new BrixConfig(null, null, null));
+            this(null);
+        }
+
+        private TestBrix(WorkspaceManager workspaceManager) {
+            super(new BrixConfig(null, workspaceManager, null));
         }
 
         @Override
         public AuthorizationStrategy newAuthorizationStrategy() {
             return null;
+        }
+    }
+
+    private static class TestWorkspaceManager implements WorkspaceManager {
+        private Listener listener;
+
+        @Override
+        public void addListener(Listener listener) {
+            this.listener = listener;
+        }
+
+        private void notifyWorkspaceDeleted(String workspaceId) {
+            listener.workspaceDeleted(workspaceId);
+        }
+
+        @Override
+        public Workspace createWorkspace() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Workspace getWorkspace(String workspaceId) {
+            return null;
+        }
+
+        @Override
+        public List<Workspace> getWorkspaces() {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public List<Workspace> getWorkspacesFiltered(Map<String, String> workspaceAttributes) {
+            return Collections.emptyList();
+        }
+
+        @Override
+        public boolean workspaceExists(String workspaceId) {
+            return false;
         }
     }
 

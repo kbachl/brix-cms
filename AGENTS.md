@@ -21,6 +21,10 @@ Use the Eclipse formatter in `etc/eclipse-formatter.xml` (4-space indentation, s
 ## Testing Guidelines
 Tests use JUnit 4; Surefire includes `**/*Test.java`. Place tests in the same package structure as the code under `src/test/java`. No coverage gate is configured, so add tests when touching logic-heavy paths or plugins.
 
+## Runtime Scope & JCR Backends
+- The clustered workspace manager is a proof of concept and is not used in production. Exclude its clustering, session, listener, performance, and stability concerns from normal production reviews, and do not change it unless explicitly requested.
+- The project intentionally contains JCR integration paths for both Jackrabbit and ModeShape. Retaining, consolidating, or removing either repository adapter is an architectural decision outside routine reviews and cleanup. Do not remove or redesign either adapter without an explicit request and migration plan; changes to shared JCR abstractions must preserve compatibility with both backends.
+
 ## Commit & Pull Request Guidelines
 Recent commits use short, imperative sentences with context, often including version bumps (e.g., "Fix exception handling during snapshot import and bump Brix version to 10.8.3"). Keep commit messages concise and specific to the module. PRs should include:
 - A short summary and affected modules.

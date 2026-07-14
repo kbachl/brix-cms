@@ -227,8 +227,7 @@ public class ManageSnapshotsPanel extends BrixGenericPanel<Workspace> {
                     for (FileUpload u : uploadList) {
                         Brix brix = getBrix();
                         JcrSession workspaceSession = null;
-                        try {
-                            InputStream s = u.getInputStream();
+                        try (InputStream s = u.getInputStream()) {
                             String id = ManageSnapshotsPanel.this.getModelObject().getId();
                             workspaceSession = brix.getCurrentSession(id);
 

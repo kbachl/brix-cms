@@ -69,18 +69,18 @@ class ClientWorkspace implements Workspace {
             return false;
         }
         ClientWorkspace that = (ClientWorkspace) obj;
-        if (id == that.id) {
-            return true;
-        }
-        if (id == null || that.id == null) {
+        String thisId = getId();
+        String thatId = that.getId();
+        if (thisId == null || thatId == null) {
             return false;
         }
-        return id.equals(that.id);
+        return thisId.equals(thatId);
     }
 
     @Override
     public int hashCode() {
-        return id != null ? id.hashCode() : 0;
+        String workspaceId = getId();
+        return workspaceId != null ? workspaceId.hashCode() : 0;
     }
 
 

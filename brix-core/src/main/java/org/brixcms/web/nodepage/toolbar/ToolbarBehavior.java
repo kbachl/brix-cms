@@ -30,7 +30,6 @@ import org.apache.wicket.request.resource.JavaScriptResourceReference;
 import org.apache.wicket.request.resource.PackageResourceReference;
 import org.apache.wicket.request.resource.ResourceReference;
 import org.apache.wicket.util.lang.Objects;
-import org.apache.wicket.util.string.Strings;
 import org.brixcms.Brix;
 import org.brixcms.Plugin;
 import org.brixcms.auth.Action.Context;
@@ -38,6 +37,8 @@ import org.brixcms.workspace.Workspace;
 import org.brixcms.workspace.WorkspaceUtils;
 
 public abstract class ToolbarBehavior extends AbstractDefaultAjaxBehavior {
+    private static final char[] HEX = "0123456789abcdef".toCharArray();
+
     private static final ResourceReference cssReference = new PackageResourceReference(
             ToolbarBehavior.class, "toolbar.css");
     private static final JavaScriptResourceReference javascriptReference = new JavaScriptResourceReference(
@@ -121,13 +122,14 @@ public abstract class ToolbarBehavior extends AbstractDefaultAjaxBehavior {
         String workspaceArray[] = new String[workspaces.size()];
         for (int i = 0; i < workspaces.size(); ++i) {
             WorkspaceEntry e = workspaces.get(i);
-            workspaceArray[i] = "{ name: '" + escape(e.visibleName) + "', value: '" + e.id + "' }";
+            workspaceArray[i] = "{ name: '" + escapeJavaScriptString(e.visibleName) + "', value: '" +
+                    escapeJavaScriptString(e.id) + "' }";
         }
 
         if (defaultWorkspace == null) {
             defaultWorkspace = "null";
         } else {
-            defaultWorkspace = "'" + defaultWorkspace + "'";
+            defaultWorkspace = "'" + escapeJavaScriptString(defaultWorkspace) + "'";
         }
 
         response.render(
@@ -135,11 +137,64 @@ public abstract class ToolbarBehavior extends AbstractDefaultAjaxBehavior {
                 defaultWorkspace + ");", "brix-toolbar-init"));
     }
 
-    private String escape(String s) {
-        String res = Strings.escapeMarkup(s).toString();
-        res.replace("\\", "\\\\");
-        res.replace("'", "\\'");
-        return res;
+    static String escapeJavaScriptString(String value) {
+        StringBuilder escaped = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '\'':
+                    escaped.append("\\'");
+                    break;
+                case '\b':
+                    escaped.append("\\b");
+                    break;
+                case '\f':
+                    escaped.append("\\f");
+                    break;
+                case '\n':
+                    escaped.append("\\n");
+                    break;
+                case '\r':
+                    escaped.append("\\r");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                case '<':
+                    escaped.append("\\u003c");
+                    break;
+                case '>':
+                    escaped.append("\\u003e");
+                    break;
+                case '&':
+                    escaped.append("\\u0026");
+                    break;
+                case '\u2028':
+                    escaped.append("\\u2028");
+                    break;
+                case '\u2029':
+                    escaped.append("\\u2029");
+                    break;
+                default:
+                    if (Character.isISOControl(c)) {
+                        appendUnicodeEscape(escaped, c);
+                    } else {
+                        escaped.append(c);
+                    }
+            }
+        }
+        return escaped.toString();
+    }
+
+    private static void appendUnicodeEscape(StringBuilder escaped, char c) {
+        escaped.append("\\u");
+        escaped.append(HEX[(c >>> 12) & 0xf]);
+        escaped.append(HEX[(c >>> 8) & 0xf]);
+        escaped.append(HEX[(c >>> 4) & 0xf]);
+        escaped.append(HEX[c & 0xf]);
     }
 
     @Override
@@ -148,6 +203,8 @@ public abstract class ToolbarBehavior extends AbstractDefaultAjaxBehavior {
     }
 
     private static class WorkspaceEntry implements Serializable {
+        private static final long serialVersionUID = 1L;
+
         private String id;
         private String visibleName;
 
@@ -155,10 +212,15 @@ public abstract class ToolbarBehavior extends AbstractDefaultAjaxBehavior {
         public boolean equals(Object obj) {
             if (this == obj)
                 return true;
-            if (obj instanceof WorkspaceEntry)
+            if (obj instanceof WorkspaceEntry == false)
                 return false;
             WorkspaceEntry that = (WorkspaceEntry) obj;
             return Objects.equal(id, that.id);
+        }
+
+        @Override
+        public int hashCode() {
+            return id != null ? id.hashCode() : 0;
         }
     }
 }

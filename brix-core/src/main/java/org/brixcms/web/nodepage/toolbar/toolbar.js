@@ -298,7 +298,7 @@
                 selected = i;
             }
             var o = document.createElement("option");
-            o.innerHTML = rev.name;
+            o.textContent = rev.name;
             select.appendChild(o);
         }
 

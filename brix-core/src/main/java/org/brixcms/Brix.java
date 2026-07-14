@@ -232,6 +232,15 @@ public abstract class Brix {
         registry.register(Tile.POINT, new PageTile());
 
         registry.register(Plugin.POINT, new SitePlugin(this));
+        WorkspaceManager workspaceManager = config.getWorkspaceManager();
+        if (workspaceManager != null) {
+            workspaceManager.addListener(new WorkspaceManager.Listener() {
+                @Override
+                public void workspaceDeleted(String workspaceId) {
+                    invalidateMarkupCache(workspaceId);
+                }
+            });
+        }
         // registry.register(Plugin.POINT, new MenuPlugin(this));
         // registry.register(Plugin.POINT, new SnapshotPlugin(this));
         // registry.register(Plugin.POINT, new PrototypePlugin(this));
@@ -312,9 +321,21 @@ public abstract class Brix {
         if (session == null) {
             return;
         }
+        invalidateMarkupCache(session.getWorkspace().getName());
+    }
+
+    /**
+     * Discards rendered markup for the specified workspace.
+     *
+     * @param workspace workspace whose markup should be discarded
+     */
+    public void invalidateMarkupCache(String workspace) {
+        if (workspace == null) {
+            return;
+        }
         SitePlugin sitePlugin = SitePlugin.get(this);
         if (sitePlugin != null) {
-            sitePlugin.getMarkupCache().invalidateWorkspace(session.getWorkspace().getName());
+            sitePlugin.getMarkupCache().invalidateWorkspace(workspace);
         }
     }
 

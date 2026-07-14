@@ -32,6 +32,7 @@ import javax.jcr.SimpleCredentials;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -208,6 +209,8 @@ public class WorkspaceManagerTest {
     @Test
     public void testWorkspaceDeletion() throws RepositoryException {
         assertEquals(0, manager.getWorkspaces().size());
+        List<String> deletedWorkspaceIds = new ArrayList<String>();
+        manager.addListener(deletedWorkspaceIds::add);
 
         Workspace w1 = manager.createWorkspace();
         Workspace w2 = manager.createWorkspace();
@@ -221,6 +224,7 @@ public class WorkspaceManagerTest {
 
         // assert w1 can no longer be retrieved
         assertNull(manager.getWorkspace(w1.getId()));
+        assertEquals(Arrays.asList(w1.getId()), deletedWorkspaceIds);
 
         w2.delete();
 
@@ -229,6 +233,7 @@ public class WorkspaceManagerTest {
 
         // assert w2 cannot be retrieved
         assertNull(manager.getWorkspace(w2.getId()));
+        assertEquals(Arrays.asList(w1.getId(), w2.getId()), deletedWorkspaceIds);
     }
 
     @Test

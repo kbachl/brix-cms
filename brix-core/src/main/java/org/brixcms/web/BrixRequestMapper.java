@@ -25,6 +25,7 @@ import java.util.Map;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import org.apache.jackrabbit.util.XMLChar;
 import org.apache.wicket.Application;
 import org.apache.wicket.Component;
 import org.apache.wicket.DefaultMapperContext;
@@ -85,6 +86,8 @@ import org.slf4j.LoggerFactory;
 
 public class BrixRequestMapper extends AbstractComponentMapper {
 
+    private static final int MALFORMED_EXPANDED_NAME = -2;
+    private static final int NOT_EXPANDED_NAME = -1;
     private static final Logger log = LoggerFactory.getLogger(BrixRequestMapper.class);
     private static final MetaDataKey<RequestPathCache> REQUEST_PATH_CACHE_KEY = new MetaDataKey<RequestPathCache>() {
     };
@@ -170,7 +173,7 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         } catch (JcrException e) {
             log.warn("JcrException caught due to incorrect url", e);
             log.warn("Tracing: URL: {}", request.getUrl());
-            log.warn("Tracing: Referer: {}",((WebRequest) request.getContainerRequest()).getHeader("referer"));
+            log.warn("Tracing: Referer: {}", getReferer(request));
         }
 
         final PageComponentInfo info = getPageComponentInfo(url);
@@ -241,6 +244,60 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         }
 
         return handler;
+    }
+
+    static String getReferer(Request request) {
+        // The container request is a servlet request, not a Wicket WebRequest.
+        return request instanceof WebRequest webRequest ? webRequest.getHeader(WebRequest.HEADER_REFERER) : null;
+    }
+
+    static boolean hasMalformedJcrName(Path path) {
+        String jcrPath = path.toString();
+        int segmentStart = path.isAbsolute() ? 1 : 0;
+        while (segmentStart < jcrPath.length()) {
+            int expandedNameEnd = getExpandedNameEnd(jcrPath, segmentStart);
+            if (expandedNameEnd == MALFORMED_EXPANDED_NAME) {
+                return true;
+            }
+            int segmentEnd = expandedNameEnd >= 0 ? jcrPath.indexOf('/', expandedNameEnd + 1)
+                    : jcrPath.indexOf('/', segmentStart);
+            if (segmentEnd < 0) {
+                segmentEnd = jcrPath.length();
+            }
+
+            if (expandedNameEnd >= 0) {
+                int localNameSeparator = jcrPath.indexOf(':', expandedNameEnd + 1);
+                if (expandedNameEnd == segmentEnd - 1
+                        || (localNameSeparator >= 0 && localNameSeparator < segmentEnd)) {
+                    return true;
+                }
+            } else {
+                String segment = jcrPath.substring(segmentStart, segmentEnd);
+                int namespaceSeparator = segment.indexOf(':');
+                if (namespaceSeparator >= 0 && (namespaceSeparator != segment.lastIndexOf(':')
+                        || !XMLChar.isValidNCName(segment.substring(0, namespaceSeparator))
+                        || namespaceSeparator == segment.length() - 1)) {
+                    return true;
+                }
+            }
+            segmentStart = segmentEnd + 1;
+        }
+        return false;
+    }
+
+    private static int getExpandedNameEnd(String jcrPath, int segmentStart) {
+        if (jcrPath.charAt(segmentStart) != '{') {
+            return NOT_EXPANDED_NAME;
+        }
+        int closingBrace = jcrPath.indexOf('}', segmentStart + 1);
+        if (closingBrace < 0) {
+            return NOT_EXPANDED_NAME;
+        }
+        String namespaceUri = jcrPath.substring(segmentStart + 1, closingBrace);
+        if (namespaceUri.isEmpty() || namespaceUri.indexOf(':') >= 0) {
+            return closingBrace;
+        }
+        return namespaceUri.indexOf('/') >= 0 ? MALFORMED_EXPANDED_NAME : NOT_EXPANDED_NAME;
     }
 
     private BrixPageParameters createBrixPageParams(Url url, Path path) {
@@ -504,7 +561,7 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         }
 
         BrixNode node = null;
-        final Path nodePath = brix.getConfig().getMapper().getNodePathForUriPath(uriPath.toAbsolute(), brix);
+        final Path nodePath = getValidNodePathForUriPath(uriPath);
         if (nodePath != null) {
             final String jcrPath = SitePlugin.get().toRealWebNodePath(nodePath.toString());
             final String workspace = WorkspaceUtils.getWorkspace();
@@ -519,6 +576,16 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         }
 
         return node;
+    }
+
+    Path getValidNodePathForUriPath(final Path uriPath) {
+        final Path nodePath = brix.getConfig().getMapper().getNodePathForUriPath(uriPath.toAbsolute(), brix);
+        if (nodePath != null && hasMalformedJcrName(nodePath)) {
+            // Invalid namespace syntax must not reach the repository parser, but URI mappers may use it publicly.
+            log.debug("Ignoring URI {} mapped to malformed JCR path: {}", uriPath, nodePath);
+            return null;
+        }
+        return nodePath;
     }
 
     private RequestPathCache getRequestPathCache() {

@@ -1,25 +1,88 @@
 package org.brixcms.web;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import javax.jcr.Node;
 
 import org.apache.wicket.model.IModel;
+import org.apache.wicket.mock.MockWebRequest;
 import org.apache.wicket.protocol.https.HttpsConfig;
 import org.apache.wicket.protocol.https.Scheme;
 import org.apache.wicket.request.IRequestHandler;
 import org.apache.wicket.request.IRequestCycle;
+import org.apache.wicket.request.Url;
+import org.apache.wicket.request.cycle.RequestCycle;
+import org.apache.wicket.request.http.WebRequest;
+import org.brixcms.Brix;
+import org.brixcms.Path;
+import org.brixcms.auth.AuthorizationStrategy;
+import org.brixcms.config.BrixConfig;
+import org.brixcms.config.PrefixUriMapper;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.web.nodepage.BrixNodePageRequestHandler;
 import org.brixcms.web.nodepage.BrixNodeRequestHandler;
 import org.brixcms.web.nodepage.BrixNodeWebPage;
 import org.brixcms.web.nodepage.BrixPageParameters;
+import org.brixcms.workspace.Workspace;
 import org.easymock.EasyMock;
 import org.junit.Test;
 
 public class BrixRequestMapperTest {
+    @Test
+    public void malformedNamespaceNameIsDetectedBeforeJcrLookup() {
+        Path malformedPath = new Path(
+                "/assets/js/Et.href,ce.extend%28%7Bactive:0,ajaxSettings:%7Burl:Et.href,isLocal:/%5E%28");
+
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(malformedPath));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/:content/page")));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/foo:bar:baz/page")));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/1foo:bar/page")));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/content:/page")));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/{urn:example}/page")));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/{urn:example}content:part/page")));
+        assertTrue(BrixRequestMapper.hasMalformedJcrName(new Path("/{foo/bar}page")));
+        assertFalse(BrixRequestMapper.hasMalformedJcrName(new Path("/brix:root/content")));
+        assertFalse(BrixRequestMapper.hasMalformedJcrName(new Path("/_custom:content/page")));
+        assertFalse(BrixRequestMapper.hasMalformedJcrName(new Path("/{foo}bar/page")));
+        assertFalse(BrixRequestMapper.hasMalformedJcrName(new Path("/{urn:example}content/page")));
+        assertFalse(BrixRequestMapper.hasMalformedJcrName(new Path("/{urn:example/path}content/page")));
+        assertFalse(BrixRequestMapper.hasMalformedJcrName(new Path("/content/products")));
+    }
+
+    @Test
+    public void jcrValidationIsAppliedAfterUriMapping() {
+        PrefixUriMapper uriMapper = new PrefixUriMapper(new Path("/cms:")) {
+            @Override
+            public Workspace getWorkspaceForRequest(RequestCycle requestCycle, Brix brix) {
+                return null;
+            }
+        };
+        BrixRequestMapper requestMapper = new BrixRequestMapper(new TestBrix(uriMapper), new HttpsConfig(80, 443));
+
+        assertEquals(new Path("/page"), requestMapper.getValidNodePathForUriPath(new Path("/cms:/page")));
+        assertEquals(new Path("/{urn:example}content"),
+                requestMapper.getValidNodePathForUriPath(new Path("/cms:/{urn:example}content")));
+        assertNull(requestMapper.getValidNodePathForUriPath(new Path("/cms:/:content")));
+        assertNull(requestMapper.getValidNodePathForUriPath(new Path("/cms:/{foo/bar}page")));
+    }
+
+    @Test
+    public void refererIsReadFromWebRequestInsteadOfContainerRequest() {
+        MockWebRequest request = new MockWebRequest(Url.parse("products")) {
+            @Override
+            public Object getContainerRequest() {
+                throw new AssertionError("The servlet container request must not be read as a Wicket WebRequest");
+            }
+        };
+        request.setHeader(WebRequest.HEADER_REFERER, "https://example.test/products");
+
+        assertEquals("https://example.test/products", BrixRequestMapper.getReferer(request));
+    }
+
     @Test
     public void desiredSchemeUsesNodeModelWithoutInstantiatingPage() {
         ExposedBrixRequestMapper mapper = new ExposedBrixRequestMapper();
@@ -93,6 +156,17 @@ public class BrixRequestMapperTest {
         @Override
         public Protocol getRequiredProtocol() {
             return protocol;
+        }
+    }
+
+    private static class TestBrix extends Brix {
+        private TestBrix(PrefixUriMapper uriMapper) {
+            super(new BrixConfig(null, null, uriMapper));
+        }
+
+        @Override
+        public AuthorizationStrategy newAuthorizationStrategy() {
+            return null;
         }
     }
 }

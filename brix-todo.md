@@ -5,6 +5,234 @@ von app-shop. `brix-demo` und der Clustered Workspace Manager sind ausdrücklich
 nicht Bestandteil dieser Aufgaben. Für app-shop ist der normale
 `Jcr2WorkspaceManager` mit ModeShape maßgeblich.
 
+## Audit 2026-08-24 – kritische Fehlerpfade aus Sicht von app-shop
+
+Die folgenden Punkte stammen aus einer gemeinsamen Prüfung von Brix und
+Whiskyworld `app-shop`/`plugin-shop`. OpenSearch- und relationale
+Datenbankursachen sowie deterministische Fehler, die den gesamten Shop für alle
+Benutzer lahmlegen würden, sind ausdrücklich nicht Bestandteil dieses Audits.
+
+Die Zuordnung bezeichnet die primäre Fehlerursache:
+
+- **Brix:** Fehler liegt im Brix-CMS und sollte hier behoben werden.
+- **app-shop:** Fehler liegt im Whiskyworld-Repository.
+- **Integration:** Brix stellt den Schutz oder Aufrufpfad bereit, app-shop macht
+  ihn durch seine Konfiguration oder Fehlerbehandlung unwirksam.
+
+### P1 – Zugriff auf unveröffentlichte Workspaces im Shop verhindern
+
+**Zuordnung: Integration; konkrete Freigabelücke in app-shop.**
+
+`WorkspaceUtils` validiert Workspaces aus `brix:workspace`, Referer und dem
+`brix-revision`-Cookie über eine `ViewWorkspaceAction`. Die
+`ShopAuthorizationStrategy` erlaubt jedoch jede Action außer dem Zugriff auf
+die Workspace-Switcher-Toolbar. Damit ist die Brix-Sicherheitsprüfung im Shop
+für `ViewWorkspaceAction` wirkungslos. Ein anonymer Benutzer kann bei Kenntnis
+einer existierenden Workspace-ID Draft- oder Staging-Inhalte abrufen; ein
+Preview-Cookie kann diesen Zustand über weitere Requests erhalten.
+
+Betroffene Stellen:
+
+- `brix-core/src/main/java/org/brixcms/workspace/WorkspaceUtils.java`
+- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopAuthorizationStrategy.java`
+
+Ziel und Abnahmekriterien:
+
+- Anonyme Benutzer dürfen ausschließlich den Production-/Default-Workspace
+  sehen.
+- Preview-Workspaces erfordern eine ausdrücklich berechtigte, authentifizierte
+  Rolle.
+- Integrationstests decken URL-Parameter, Referer, Cookie und Logout ab.
+
+### P1 – Unerwartete Fehler bei der URL-Erzeugung nicht als stille 404 tarnen
+
+**Zuordnung: app-shop; der verdeckte Fehler kann aus Brix stammen.**
+
+`ShopRequestMapper.mapHandler()` fängt jede `RuntimeException` des gewrappten
+Mappers ab, verwirft die Originalexception und erzeugt eine neue
+`AbortWithHttpErrorCodeException(404)`. Der `ShopRequestCycleListener` behandelt
+diese anschließend nur als normalen HTTP-Abbruch auf DEBUG-Ebene. Fehler in
+Brix-Referenzen, Page-/Tile-Parametern, CDI oder anderer URL-Erzeugungslogik
+erscheinen dadurch als gewöhnliche 404 ohne Ursache und Stacktrace.
+
+Besonders kritisch ist der Standardcheckout: Die Bestellung wird erstellt und
+der Warenkorb geleert, bevor die URL zur Bestellansicht mit
+`Reference.generateUrl()` erzeugt wird. Scheitert diese URL-Erzeugung, sieht der
+Kunde nach erfolgreicher Bestellung nur eine 404 und der eigentliche Fehler ist
+in den Logs nicht mehr vorhanden.
+
+Betroffene Stellen:
+
+- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopRequestMapper.java`
+- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopRequestCycleListener.java`
+- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/checkout/version1/steps/Step4PruefenBestellen.java`
+- `brix-core/src/main/java/org/brixcms/web/reference/Reference.java`
+
+Ziel und Abnahmekriterien:
+
+- Nur konkret erwartete Mapper-Misses in 404 umwandeln.
+- Unerwartete Exceptions mit Originalcause, Handler-Typ und Request-Kontext auf
+  ERROR loggen beziehungsweise unverändert weiterreichen.
+- Nach bereits angelegter Bestellung bei einem Redirectfehler einen stabilen,
+  geloggten Fallback zur Bestellansicht anbieten.
+- Tests erzwingen eine Exception aus dem gewrappten `mapHandler()` und prüfen,
+  dass sie weder verloren geht noch als unauffällige 404 endet.
+
+### P1 – Redirect-Schleifen bei echten Markupfehlern vermeiden
+
+**Zuordnung: app-shop.**
+
+Der `ShopRequestCycleListener` behandelt eine direkte
+`MarkupNotFoundException` wie einen veralteten Wicket-Callback und leitet auf
+die um Wicket-Informationen bereinigte aktuelle URL um. Ist die URL bereits
+kanonisch, ist das Redirect-Ziel identisch mit der aktuellen URL. Ein echter
+Markupfehler einer einzelnen Page oder eines Tiles kann dadurch eine endlose
+Redirect-Schleife erzeugen, ohne ERROR-Log oder Stacktrace.
+
+Betroffene Stelle:
+
+- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopRequestCycleListener.java`
+
+Ziel und Abnahmekriterien:
+
+- Nur aufräumbare stale Callback-Fehler umleiten.
+- Eine Umleitung nur ausführen, wenn sich die bereinigte URL tatsächlich von
+  der aktuellen URL unterscheidet.
+- Echte `MarkupNotFoundException` mit Request- und Page-Kontext loggen und über
+  einen definierten Fehlerhandler beantworten.
+- Tests decken Markupfehler auf kanonischen URLs sowie verschachtelte
+  Exceptions ab.
+
+### P1, falls noch erreichbar – TLS-Prüfung im Paydirekt-/Giropay-Pfad aktivieren
+
+**Zuordnung: app-shop/plugin-shop.**
+
+`TrustAllHttpCloseableClient` verwendet `TrustAllStrategy` und akzeptiert damit
+beliebige Zertifikatsketten. Der Client wird im Paydirekt-Zahlungs- und
+Bestellstatuspfad weiterhin referenziert. Ist diese Zahlart noch konfiguriert,
+für Altbestellungen erreichbar oder reaktivierbar, besteht ein
+Man-in-the-Middle-Risiko für Zahlungsaufrufe.
+
+Betroffene Stellen:
+
+- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/bestellansicht/payment/paydirekt/TrustAllHttpCloseableClient.java`
+- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/bestellansicht/BestellungStatusPanel.java`
+- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/bestellansicht/payment/paydirekt/PaymentPanelPD.java`
+
+Ziel:
+
+- Zunächst feststellen, ob der Pfad produktiv oder für Altbestellungen noch
+  erreichbar ist.
+- Bei Erreichbarkeit ausschließlich reguläre Zertifikats- und
+  Hostname-Validierung verwenden; andernfalls den toten Zahlungspfad samt
+  Konfiguration kontrolliert entfernen.
+
+### P2 – Fehler nach erfolgreicher Bestellerstellung strukturiert loggen
+
+**Zuordnung: app-shop/plugin-shop.**
+
+Der Standardcheckout verwendet nach der Bestellerstellung für Fehler beim
+Aktualisieren von Kundenadressen `printStackTrace()` und für Tracking-Snapshot
+sowie Neu-/Bestandskundenermittlung leere Catch-Blöcke. Dadurch fehlen je nach
+Logging-Setup Bestellnummer, Request-Kontext und Stacktrace vollständig. Der
+Express-Checkout loggt vergleichbare Fehler bereits strukturiert.
+
+Betroffene Stelle:
+
+- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/checkout/version1/steps/Step4PruefenBestellen.java`
+
+Ziel:
+
+- Leere Catch-Blöcke und `printStackTrace()` durch strukturiertes Logging mit
+  Bestellnummer und betroffenem Nachbearbeitungsschritt ersetzen.
+- Fachlich bewusste Best-Effort-Schritte weiterhin vom erfolgreichen Anlegen
+  der Bestellung entkoppeln, aber sichtbar und messbar machen.
+
+### Erledigt 2026-08-24 – Fehlgeschlagene Markup-Cache-Invalidierung sichtbar machen
+
+**Zuordnung: Brix.**
+
+`MarkupCacheInvalidationListener` loggt unerwartete Invalidierungsfehler jetzt
+auf WARN mit Workspace, Node-ID und sicher ermitteltem Pfad. Scheitert die
+gezielte Invalidierung, wird der vollständige Cache-Bucket des betroffenen
+Workspaces entfernt. Schlägt auch dieser Fallback fehl oder ist der Workspace
+nicht sicher ermittelbar, wird dies im WARN-Log ausdrücklich ausgewiesen; eine
+Fallbackexception bleibt als unterdrückte Exception am ursprünglichen Fehler
+erhalten.
+
+Betroffene Stellen:
+
+- `brix-core/src/main/java/org/brixcms/markup/MarkupCacheInvalidationListener.java`
+- `brix-core/src/main/java/org/brixcms/markup/MarkupCache.java`
+
+Umgesetzte Abnahmekriterien:
+
+- Unerwartete Invalidierungsfehler werden auf WARN mit Workspace, Node-ID,
+  sicherem Pfad und Stacktrace geloggt.
+- Der betroffene Workspace-Cache-Bucket wird als sicherer Fallback entfernt.
+- `MarkupCacheTest.failedTargetedInvalidationInvalidatesTheCompleteWorkspaceCache`
+  erzwingt den Fehler und weist nach, dass das Production-Markup neu erzeugt
+  wird, während der Cache eines anderen Workspaces erhalten bleibt.
+
+### P2 – Client-Abbrüche nicht nur anhand breiter Meldungstexte erkennen
+
+**Zuordnung: Brix und app-shop.**
+
+`ResourceNodeHandler` und `CachingFilter` stufen Exceptions anhand von
+Meldungsteilen wie `connection is closed`, `stream was already closed` oder
+jedem `h2exception` als harmlosen Client-Abbruch ein. Diese Meldungen sind nicht
+client-exklusiv. Ein echter serverseitiger Stream- oder HTTP/2-Fehler kann so
+nur auf DEBUG erscheinen und eine unvollständige CSS-, JavaScript-, Bild- oder
+sonstige Response hinterlassen.
+
+Betroffene Stellen:
+
+- `brix-core/src/main/java/org/brixcms/plugin/site/resource/ResourceNodeHandler.java`
+- `app-shop/src/main/java/de/whiskyworld/filter/CachingFilter.java`
+
+Ziel:
+
+- Soweit vom Container möglich konkrete Abort-Exception-Typen und Zustände
+  verwenden.
+- Unspezifische Texte wie jedes `h2exception` nicht pauschal unterdrücken.
+- Unterdrückte Abbrüche über eine Metrik zählen und unbekannte Fälle mit
+  Request-Pfad und Cause mindestens auf WARN sichtbar machen.
+
+### P3 – `IPageRequestHandler`-Vertrag korrekt implementieren
+
+**Zuordnung: Brix.**
+
+`BrixNodeRequestHandler.isPageInstanceCreated()` liefert derzeit `true`, wenn
+`page == null` ist. Der Wicket-Vertrag verlangt das Gegenteil. Dadurch erhalten
+Wicket-Integrationen wie CDI-Conversation-Propagation für bereits erzeugte
+Brix-Pages keinen Page-Kontext und können für noch nicht erzeugte Pages einen
+falschen Zustand sehen. Im aktuellen Shop wurden keine `@ConversationScoped`-
+Beans gefunden; der Fehler ist dort daher momentan eher latent, im Brix-API
+aber eindeutig.
+
+Betroffene Stelle:
+
+- `brix-core/src/main/java/org/brixcms/web/nodepage/BrixNodeRequestHandler.java`
+
+Ziel und Abnahmekriterien:
+
+- `isPageInstanceCreated()` liefert genau dann `true`, wenn `page != null` ist.
+- Tests decken sowohl den page-basierten als auch den model-basierten
+  Konstruktor und `IPageRequestHandler.getPage()` ab.
+
+### Verifikation und bestehende Testlücken
+
+Zum Audit-Zeitpunkt liefen folgende bestehende Tests erfolgreich:
+
+- `mvn -pl brix-core test`: 104 Tests, keine Fehler.
+- `ShopRequestMapperTest` und `ShopRequestCycleListenerTest`: 43 Tests, keine
+  Fehler.
+
+Die genannten Grenzfälle sind in diesen Tests nicht abgedeckt. Insbesondere
+fehlen Tests für `ViewWorkspaceAction` in app-shop, Exceptions aus
+`ShopRequestMapper.mapHandler()`, `MarkupNotFoundException` auf einer bereits
+kanonischen URL und den invertierten Page-Handler-Zustand.
+
 ## Hohe Priorität
 
 ### Publishing und Snapshot-Restore atomar oder wiederherstellbar machen

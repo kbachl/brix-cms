@@ -22,6 +22,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 import javax.jcr.Node;
+import javax.jcr.observation.EventIterator;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -34,10 +35,13 @@ import org.brixcms.Brix;
 import org.brixcms.auth.AuthorizationStrategy;
 import org.brixcms.config.BrixConfig;
 import org.brixcms.jcr.api.JcrSession;
+import org.brixcms.jcr.api.JcrProperty;
 import org.brixcms.jcr.api.JcrWorkspace;
+import org.brixcms.jcr.base.SaveEvent;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.markup.tag.Item;
 import org.brixcms.plugin.site.SitePlugin;
+import org.brixcms.plugin.site.page.PageSiteNodePlugin;
 import org.brixcms.web.generic.IGenericComponent;
 import org.brixcms.workspace.Workspace;
 import org.brixcms.workspace.WorkspaceManager;
@@ -143,6 +147,36 @@ public class MarkupCacheTest {
         assertEquals(2, markupSource.generatedMarkupCount);
     }
 
+    @Test
+    public void failedTargetedInvalidationInvalidatesTheCompleteWorkspaceCache() {
+        TestBrix brix = new TestBrix();
+        FailingMarkupCache cache = new FailingMarkupCache();
+        TestMarkupSource productionSource = new TestMarkupSource();
+        TestMarkupSource developmentSource = new TestMarkupSource();
+        TestContainerNode savedProductionNode = containerNodeInWorkspace("production", "page-id", "/page");
+        TestComponent production = new TestComponent(savedProductionNode, productionSource);
+        TestComponent development = new TestComponent(
+                nodeInWorkspace("development", "page-id"), developmentSource);
+        cache.getMarkup(production);
+        cache.getMarkup(development);
+
+        SaveEvent saveEvent = EasyMock.createMock(SaveEvent.class);
+        EventIterator events = EasyMock.createMock(EventIterator.class);
+        EasyMock.expect(events.hasNext()).andReturn(true);
+        EasyMock.expect(events.nextEvent()).andReturn(saveEvent);
+        EasyMock.expect(saveEvent.getNode()).andReturn(savedProductionNode);
+        EasyMock.expect(events.hasNext()).andReturn(false);
+        EasyMock.replay(saveEvent, events);
+
+        new MarkupCacheInvalidationListener(brix, () -> cache).onEvent(events);
+        cache.getMarkup(production);
+        cache.getMarkup(development);
+
+        assertEquals(2, productionSource.generatedMarkupCount);
+        assertEquals(1, developmentSource.generatedMarkupCount);
+        EasyMock.verify(saveEvent, events);
+    }
+
     private static BrixNode nodeInWorkspace(String workspaceName, String identifier) {
         JcrSession session = EasyMock.createMock(JcrSession.class);
         JcrWorkspace workspace = EasyMock.createMock(JcrWorkspace.class);
@@ -150,6 +184,15 @@ public class MarkupCacheTest {
         EasyMock.expect(workspace.getName()).andReturn(workspaceName).anyTimes();
         EasyMock.replay(session, workspace);
         return new TestNode(session, identifier);
+    }
+
+    private static TestContainerNode containerNodeInWorkspace(String workspaceName, String identifier, String path) {
+        JcrSession session = EasyMock.createMock(JcrSession.class);
+        JcrWorkspace workspace = EasyMock.createMock(JcrWorkspace.class);
+        EasyMock.expect(session.getWorkspace()).andReturn(workspace).anyTimes();
+        EasyMock.expect(workspace.getName()).andReturn(workspaceName).anyTimes();
+        EasyMock.replay(session, workspace);
+        return new TestContainerNode(session, identifier, path);
     }
 
     private static class TestBrix extends Brix {
@@ -228,6 +271,41 @@ public class MarkupCacheTest {
         @Override
         public String getIdentifier() {
             return identifier;
+        }
+    }
+
+    private static class TestContainerNode extends TestNode {
+        private final String path;
+        private final JcrProperty nodeTypeProperty;
+
+        private TestContainerNode(JcrSession session, String identifier, String path) {
+            super(session, identifier);
+            this.path = path;
+            nodeTypeProperty = EasyMock.createMock(JcrProperty.class);
+            EasyMock.expect(nodeTypeProperty.getString()).andReturn(PageSiteNodePlugin.TYPE).anyTimes();
+            EasyMock.replay(nodeTypeProperty);
+        }
+
+        @Override
+        public boolean hasProperty(String relPath) {
+            return "brix:nodeType".equals(relPath);
+        }
+
+        @Override
+        public JcrProperty getProperty(String relPath) {
+            return nodeTypeProperty;
+        }
+
+        @Override
+        public String getPath() {
+            return path;
+        }
+    }
+
+    private static class FailingMarkupCache extends MarkupCache {
+        @Override
+        public void invalidate(BrixNode node) {
+            throw new IllegalStateException("forced targeted invalidation failure");
         }
     }
 

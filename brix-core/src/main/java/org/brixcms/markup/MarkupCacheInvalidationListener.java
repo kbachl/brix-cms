@@ -18,6 +18,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import javax.jcr.Node;
 import javax.jcr.observation.Event;
@@ -42,13 +43,23 @@ public class MarkupCacheInvalidationListener implements SaveEventListener {
     private static final Logger log = LoggerFactory.getLogger(MarkupCacheInvalidationListener.class);
     private static final String TEMPLATE_PROPERTY = Brix.NS_PREFIX + "template";
 
-    private final Brix brix;
+    private final Supplier<MarkupCache> markupCacheSupplier;
 
     public MarkupCacheInvalidationListener(Brix brix) {
+        this(brix, () -> {
+            SitePlugin plugin = SitePlugin.get(brix);
+            return plugin == null ? null : plugin.getMarkupCache();
+        });
+    }
+
+    MarkupCacheInvalidationListener(Brix brix, Supplier<MarkupCache> markupCacheSupplier) {
         if (brix == null) {
             throw new IllegalArgumentException("brix may not be null");
         }
-        this.brix = brix;
+        if (markupCacheSupplier == null) {
+            throw new IllegalArgumentException("markupCacheSupplier may not be null");
+        }
+        this.markupCacheSupplier = markupCacheSupplier;
     }
 
     @Override
@@ -65,18 +76,43 @@ public class MarkupCacheInvalidationListener implements SaveEventListener {
         if (node == null) {
             return;
         }
+        String workspace = safeWorkspace(node);
+        String nodeId = safeNodeId(node);
+        String path = safePath(node);
+        MarkupCache cache = null;
         try {
+            cache = markupCacheSupplier.get();
+            if (cache == null) {
+                return;
+            }
             JcrNode container = resolveContainerNode(node);
             if (container == null) {
                 return;
             }
-            SitePlugin plugin = SitePlugin.get(brix);
-            if (plugin == null) {
-                return;
-            }
-            invalidateContainerAndDependents(plugin.getMarkupCache(), container);
+            invalidateContainerAndDependents(cache, container);
         } catch (RuntimeException e) {
-            log.debug("Failed to invalidate markup cache for {}", safePath(node), e);
+            if (invalidateWorkspaceSafely(cache, workspace, e)) {
+                log.warn("Failed to invalidate markup cache for workspace '{}', node '{}', path '{}'; "
+                        + "invalidated the complete workspace cache as fallback", safeValue(workspace), nodeId, path,
+                        e);
+            } else {
+                log.warn("Failed to invalidate markup cache for workspace '{}', node '{}', path '{}'; "
+                        + "complete workspace cache fallback could not be applied", safeValue(workspace), nodeId, path,
+                        e);
+            }
+        }
+    }
+
+    private boolean invalidateWorkspaceSafely(MarkupCache cache, String workspace, RuntimeException originalFailure) {
+        if (cache == null || workspace == null) {
+            return false;
+        }
+        try {
+            cache.invalidateWorkspace(workspace);
+            return true;
+        } catch (RuntimeException fallbackFailure) {
+            originalFailure.addSuppressed(fallbackFailure);
+            return false;
         }
     }
 
@@ -159,9 +195,31 @@ public class MarkupCacheInvalidationListener implements SaveEventListener {
 
     private String safePath(JcrNode node) {
         try {
-            return node.getPath();
+            String path = node.getPath();
+            return path == null ? "(unknown)" : path;
         } catch (RuntimeException e) {
             return "(unknown)";
         }
+    }
+
+    private String safeWorkspace(JcrNode node) {
+        try {
+            return node.getSession().getWorkspace().getName();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private String safeNodeId(JcrNode node) {
+        try {
+            String nodeId = node.isNodeType("mix:referenceable") ? node.getIdentifier() : node.getPath();
+            return nodeId == null ? "(unknown)" : nodeId;
+        } catch (RuntimeException e) {
+            return "(unknown)";
+        }
+    }
+
+    private String safeValue(String value) {
+        return value == null ? "(unknown)" : value;
     }
 }

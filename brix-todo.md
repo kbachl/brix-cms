@@ -44,88 +44,7 @@ Ziel und Abnahmekriterien:
   Rolle.
 - Integrationstests decken URL-Parameter, Referer, Cookie und Logout ab.
 
-### P1 – Unerwartete Fehler bei der URL-Erzeugung nicht als stille 404 tarnen
 
-**Zuordnung: app-shop; der verdeckte Fehler kann aus Brix stammen.**
-
-`ShopRequestMapper.mapHandler()` fängt jede `RuntimeException` des gewrappten
-Mappers ab, verwirft die Originalexception und erzeugt eine neue
-`AbortWithHttpErrorCodeException(404)`. Der `ShopRequestCycleListener` behandelt
-diese anschließend nur als normalen HTTP-Abbruch auf DEBUG-Ebene. Fehler in
-Brix-Referenzen, Page-/Tile-Parametern, CDI oder anderer URL-Erzeugungslogik
-erscheinen dadurch als gewöhnliche 404 ohne Ursache und Stacktrace.
-
-Besonders kritisch ist der Standardcheckout: Die Bestellung wird erstellt und
-der Warenkorb geleert, bevor die URL zur Bestellansicht mit
-`Reference.generateUrl()` erzeugt wird. Scheitert diese URL-Erzeugung, sieht der
-Kunde nach erfolgreicher Bestellung nur eine 404 und der eigentliche Fehler ist
-in den Logs nicht mehr vorhanden.
-
-Betroffene Stellen:
-
-- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopRequestMapper.java`
-- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopRequestCycleListener.java`
-- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/checkout/version1/steps/Step4PruefenBestellen.java`
-- `brix-core/src/main/java/org/brixcms/web/reference/Reference.java`
-
-Ziel und Abnahmekriterien:
-
-- Nur konkret erwartete Mapper-Misses in 404 umwandeln.
-- Unerwartete Exceptions mit Originalcause, Handler-Typ und Request-Kontext auf
-  ERROR loggen beziehungsweise unverändert weiterreichen.
-- Nach bereits angelegter Bestellung bei einem Redirectfehler einen stabilen,
-  geloggten Fallback zur Bestellansicht anbieten.
-- Tests erzwingen eine Exception aus dem gewrappten `mapHandler()` und prüfen,
-  dass sie weder verloren geht noch als unauffällige 404 endet.
-
-### P1 – Redirect-Schleifen bei echten Markupfehlern vermeiden
-
-**Zuordnung: app-shop.**
-
-Der `ShopRequestCycleListener` behandelt eine direkte
-`MarkupNotFoundException` wie einen veralteten Wicket-Callback und leitet auf
-die um Wicket-Informationen bereinigte aktuelle URL um. Ist die URL bereits
-kanonisch, ist das Redirect-Ziel identisch mit der aktuellen URL. Ein echter
-Markupfehler einer einzelnen Page oder eines Tiles kann dadurch eine endlose
-Redirect-Schleife erzeugen, ohne ERROR-Log oder Stacktrace.
-
-Betroffene Stelle:
-
-- `app-shop/src/main/java/de/whiskyworld/shop/web/ShopRequestCycleListener.java`
-
-Ziel und Abnahmekriterien:
-
-- Nur aufräumbare stale Callback-Fehler umleiten.
-- Eine Umleitung nur ausführen, wenn sich die bereinigte URL tatsächlich von
-  der aktuellen URL unterscheidet.
-- Echte `MarkupNotFoundException` mit Request- und Page-Kontext loggen und über
-  einen definierten Fehlerhandler beantworten.
-- Tests decken Markupfehler auf kanonischen URLs sowie verschachtelte
-  Exceptions ab.
-
-### P1, falls noch erreichbar – TLS-Prüfung im Paydirekt-/Giropay-Pfad aktivieren
-
-**Zuordnung: app-shop/plugin-shop.**
-
-`TrustAllHttpCloseableClient` verwendet `TrustAllStrategy` und akzeptiert damit
-beliebige Zertifikatsketten. Der Client wird im Paydirekt-Zahlungs- und
-Bestellstatuspfad weiterhin referenziert. Ist diese Zahlart noch konfiguriert,
-für Altbestellungen erreichbar oder reaktivierbar, besteht ein
-Man-in-the-Middle-Risiko für Zahlungsaufrufe.
-
-Betroffene Stellen:
-
-- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/bestellansicht/payment/paydirekt/TrustAllHttpCloseableClient.java`
-- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/bestellansicht/BestellungStatusPanel.java`
-- `plugin-shop/src/main/java/de/whiskyworld/shop/plugin/tiles/bestellansicht/payment/paydirekt/PaymentPanelPD.java`
-
-Ziel:
-
-- Zunächst feststellen, ob der Pfad produktiv oder für Altbestellungen noch
-  erreichbar ist.
-- Bei Erreichbarkeit ausschließlich reguläre Zertifikats- und
-  Hostname-Validierung verwenden; andernfalls den toten Zahlungspfad samt
-  Konfiguration kontrolliert entfernen.
 
 ### P2 – Fehler nach erfolgreicher Bestellerstellung strukturiert loggen
 
@@ -147,32 +66,6 @@ Ziel:
   Bestellnummer und betroffenem Nachbearbeitungsschritt ersetzen.
 - Fachlich bewusste Best-Effort-Schritte weiterhin vom erfolgreichen Anlegen
   der Bestellung entkoppeln, aber sichtbar und messbar machen.
-
-### Erledigt 2026-08-24 – Fehlgeschlagene Markup-Cache-Invalidierung sichtbar machen
-
-**Zuordnung: Brix.**
-
-`MarkupCacheInvalidationListener` loggt unerwartete Invalidierungsfehler jetzt
-auf WARN mit Workspace, Node-ID und sicher ermitteltem Pfad. Scheitert die
-gezielte Invalidierung, wird der vollständige Cache-Bucket des betroffenen
-Workspaces entfernt. Schlägt auch dieser Fallback fehl oder ist der Workspace
-nicht sicher ermittelbar, wird dies im WARN-Log ausdrücklich ausgewiesen; eine
-Fallbackexception bleibt als unterdrückte Exception am ursprünglichen Fehler
-erhalten.
-
-Betroffene Stellen:
-
-- `brix-core/src/main/java/org/brixcms/markup/MarkupCacheInvalidationListener.java`
-- `brix-core/src/main/java/org/brixcms/markup/MarkupCache.java`
-
-Umgesetzte Abnahmekriterien:
-
-- Unerwartete Invalidierungsfehler werden auf WARN mit Workspace, Node-ID,
-  sicherem Pfad und Stacktrace geloggt.
-- Der betroffene Workspace-Cache-Bucket wird als sicherer Fallback entfernt.
-- `MarkupCacheTest.failedTargetedInvalidationInvalidatesTheCompleteWorkspaceCache`
-  erzwingt den Fehler und weist nach, dass das Production-Markup neu erzeugt
-  wird, während der Cache eines anderen Workspaces erhalten bleibt.
 
 ### P2 – Client-Abbrüche nicht nur anhand breiter Meldungstexte erkennen
 

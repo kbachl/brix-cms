@@ -3,19 +3,28 @@ package org.brixcms.web;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import javax.jcr.Node;
 
+import org.apache.wicket.WicketRuntimeException;
+import org.apache.wicket.core.request.handler.PageProvider;
+import org.apache.wicket.core.request.handler.RenderPageRequestHandler;
+import org.apache.wicket.core.request.mapper.IPageSource;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.mock.MockWebRequest;
+import org.apache.wicket.protocol.http.PageExpiredException;
 import org.apache.wicket.protocol.https.HttpsConfig;
 import org.apache.wicket.protocol.https.Scheme;
 import org.apache.wicket.request.IRequestHandler;
 import org.apache.wicket.request.IRequestCycle;
 import org.apache.wicket.request.Url;
+import org.apache.wicket.request.component.IRequestablePage;
 import org.apache.wicket.request.cycle.RequestCycle;
 import org.apache.wicket.request.http.WebRequest;
+import org.apache.wicket.request.mapper.parameter.PageParameters;
 import org.brixcms.Brix;
 import org.brixcms.Path;
 import org.brixcms.auth.AuthorizationStrategy;
@@ -23,6 +32,7 @@ import org.brixcms.config.BrixConfig;
 import org.brixcms.config.PrefixUriMapper;
 import org.brixcms.jcr.api.JcrSession;
 import org.brixcms.jcr.wrapper.BrixNode;
+import org.brixcms.plugin.site.page.PageRenderingPage;
 import org.brixcms.web.nodepage.BrixNodePageRequestHandler;
 import org.brixcms.web.nodepage.BrixNodeRequestHandler;
 import org.brixcms.web.nodepage.BrixNodeWebPage;
@@ -112,6 +122,56 @@ public class BrixRequestMapperTest {
         new BrixNodeRequestHandler(model).detach(EasyMock.createNiceMock(IRequestCycle.class));
 
         assertTrue(model.detached);
+    }
+
+    @Test
+    public void expiredPageRenderingPageWithoutBrixFactoryBecomesPageExpired() {
+        WicketRuntimeException recreationFailure = missingPageRenderingPageConstructor();
+        RenderPageRequestHandler handler = expiredPageRenderingHandler(recreationFailure);
+        BrixRequestMapper mapper = new BrixRequestMapper(null, new HttpsConfig(80, 443));
+
+        PageExpiredException result = assertThrows(PageExpiredException.class, () -> mapper.mapHandler(handler));
+
+        assertSame(recreationFailure, result.getCause());
+    }
+
+    @Test
+    public void newPageRenderingPageConstructionFailureRemainsVisible() {
+        WicketRuntimeException recreationFailure = missingPageRenderingPageConstructor();
+        PageProvider provider = new PageProvider(PageRenderingPage.class, new PageParameters());
+        provider.setPageSource(failingPageSource(recreationFailure));
+        RenderPageRequestHandler handler = new RenderPageRequestHandler(provider);
+        BrixRequestMapper mapper = new BrixRequestMapper(null, new HttpsConfig(80, 443));
+
+        WicketRuntimeException result = assertThrows(WicketRuntimeException.class, () -> mapper.mapHandler(handler));
+
+        assertSame(recreationFailure, result);
+    }
+
+    private static RenderPageRequestHandler expiredPageRenderingHandler(WicketRuntimeException recreationFailure) {
+        PageProvider provider = new PageProvider(42, PageRenderingPage.class, new PageParameters(), 1);
+        provider.setPageSource(failingPageSource(recreationFailure));
+        return new RenderPageRequestHandler(provider);
+    }
+
+    private static IPageSource failingPageSource(WicketRuntimeException recreationFailure) {
+        return new IPageSource() {
+            @Override
+            public IRequestablePage getPageInstance(int pageId) {
+                return null;
+            }
+
+            @Override
+            public IRequestablePage newPageInstance(Class<? extends IRequestablePage> pageClass,
+                    PageParameters pageParameters) {
+                throw recreationFailure;
+            }
+        };
+    }
+
+    private static WicketRuntimeException missingPageRenderingPageConstructor() {
+        return new WicketRuntimeException("Unable to create page from class " + PageRenderingPage.class.getName(),
+                new NoSuchMethodException(PageRenderingPage.class.getName() + ".<init>()"));
     }
 
     private static class ExposedBrixRequestMapper extends BrixRequestMapper {

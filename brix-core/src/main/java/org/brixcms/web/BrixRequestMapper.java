@@ -30,6 +30,7 @@ import org.apache.wicket.Application;
 import org.apache.wicket.Component;
 import org.apache.wicket.DefaultMapperContext;
 import org.apache.wicket.MetaDataKey;
+import org.apache.wicket.WicketRuntimeException;
 import org.apache.wicket.core.request.handler.BookmarkableListenerRequestHandler;
 import org.apache.wicket.core.request.handler.IPageProvider;
 import org.apache.wicket.core.request.handler.IPageRequestHandler;
@@ -40,6 +41,7 @@ import org.apache.wicket.core.request.handler.RenderPageRequestHandler;
 import org.apache.wicket.core.request.mapper.AbstractComponentMapper;
 import org.apache.wicket.core.request.mapper.IPageSource;
 import org.apache.wicket.markup.html.WebPage;
+import org.apache.wicket.protocol.http.PageExpiredException;
 import org.apache.wicket.protocol.https.HttpsConfig;
 import org.apache.wicket.protocol.https.HttpsMapper;
 import org.apache.wicket.protocol.https.Scheme;
@@ -388,8 +390,17 @@ public class BrixRequestMapper extends AbstractComponentMapper {
                 return null;
             }
         } else if (requestHandler instanceof RenderPageRequestHandler handler) {
-            if (handler.getPage() instanceof BrixNodeWebPage) {
-                BrixNodeWebPage page = (BrixNodeWebPage) handler.getPage();
+            IRequestablePage requestablePage;
+            try {
+                requestablePage = handler.getPage();
+            } catch (WicketRuntimeException e) {
+                if (isExpiredPageRenderingPageRecreation(handler, e)) {
+                    throw new PageExpiredException("Brix page with id '" + handler.getPageId()
+                            + "' has expired and cannot be recreated without its node context.", e);
+                }
+                throw e;
+            }
+            if (requestablePage instanceof BrixNodeWebPage page) {
                 PageInfo i = new PageInfo(page.getPageId());
                 PageComponentInfo info = new PageComponentInfo(i, null);
                 Url url = encode(page);
@@ -418,6 +429,22 @@ public class BrixRequestMapper extends AbstractComponentMapper {
         } else {
             return null;
         }
+    }
+
+    static boolean isExpiredPageRenderingPageRecreation(RenderPageRequestHandler handler,
+            WicketRuntimeException error) {
+        if (handler.getPageId() == null || !handler.getPageProvider().wasExpired()
+                || handler.getPageClass() != PageRenderingPage.class) {
+            return false;
+        }
+
+        String missingConstructor = PageRenderingPage.class.getName() + ".<init>()";
+        for (Throwable current = error; current != null; current = current.getCause()) {
+            if (current instanceof NoSuchMethodException && missingConstructor.equals(current.getMessage())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     protected final PageInfo getPageInfo(IPageRequestHandler handler) {

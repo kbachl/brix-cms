@@ -14,13 +14,20 @@
 
 package org.brixcms.markup;
 
+import org.apache.wicket.Application;
 import org.apache.wicket.MarkupContainer;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.web.generic.IGenericComponent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 
 /**
  * Contains {@link GeneratedMarkup} instances associated with {@link MarkupContainer}s. The {@link MarkupContainer}s
@@ -30,8 +37,31 @@ import java.util.concurrent.ConcurrentMap;
  * @author Matej Knopp
  */
 public class MarkupCache {
+    private static final Logger log = LoggerFactory.getLogger(MarkupCache.class);
+    private static final long WICKET_CACHE_CLEAR_THRESHOLD = 100_000;
+
     private final ConcurrentMap<String, ConcurrentMap<CacheKey, GeneratedMarkup>> workspaceCaches =
             new ConcurrentHashMap<String, ConcurrentMap<CacheKey, GeneratedMarkup>>();
+    private final ConcurrentMap<String, ConcurrentMap<WicketCacheIdentity, String>> wicketCacheKeys =
+            new ConcurrentHashMap<String, ConcurrentMap<WicketCacheIdentity, String>>();
+    private final ConcurrentLinkedQueue<String> retiredWicketCacheKeys = new ConcurrentLinkedQueue<String>();
+    private final AtomicBoolean drainingRetiredWicketCacheKeys = new AtomicBoolean();
+    private final AtomicLong retiredWicketCacheKeysSinceClear = new AtomicLong();
+    private final WicketMarkupRemover wicketMarkupRemover;
+    private final BooleanSupplier wicketMarkupCacheClearer;
+
+    public MarkupCache() {
+        this(MarkupCache::removeWicketMarkup, MarkupCache::clearWicketMarkupCache);
+    }
+
+    MarkupCache(WicketMarkupRemover wicketMarkupRemover) {
+        this(wicketMarkupRemover, () -> false);
+    }
+
+    MarkupCache(WicketMarkupRemover wicketMarkupRemover, BooleanSupplier wicketMarkupCacheClearer) {
+        this.wicketMarkupRemover = Objects.requireNonNull(wicketMarkupRemover, "wicketMarkupRemover");
+        this.wicketMarkupCacheClearer = Objects.requireNonNull(wicketMarkupCacheClearer, "wicketMarkupCacheClearer");
+    }
 
     /**
      * Returns the {@link GeneratedMarkup} instance for given container. The container must implement {@link
@@ -69,6 +99,7 @@ public class MarkupCache {
         if (cache != null) {
             cache.keySet().removeIf(key -> nodeId.equals(key.nodeId));
         }
+        retireWicketCacheKeys(workspace, nodeId);
     }
 
     /**
@@ -84,11 +115,111 @@ public class MarkupCache {
             return;
         }
         workspaceCaches.remove(workspace);
+        ConcurrentMap<WicketCacheIdentity, String> removedWicketKeys = wicketCacheKeys.remove(workspace);
+        if (removedWicketKeys != null) {
+            for (String wicketCacheKey : removedWicketKeys.values()) {
+                retireWicketCacheKey(wicketCacheKey);
+            }
+        }
     }
 
     private ConcurrentMap<CacheKey, GeneratedMarkup> getWorkspaceCache(String workspace) {
         return workspaceCaches.computeIfAbsent(workspace,
                 ignored -> new ConcurrentHashMap<CacheKey, GeneratedMarkup>());
+    }
+
+    String getWicketCacheKey(String workspace, String nodeId, String componentClass, String locale, String style,
+                             String variation, String markupType, String markupHash) {
+        drainRetiredWicketCacheKeys();
+
+        WicketCacheIdentity identity = new WicketCacheIdentity(nodeId, componentClass, locale, style, variation,
+                markupType);
+        String currentKey = identity.toWicketCacheKey(workspace, markupHash);
+        ConcurrentMap<WicketCacheIdentity, String> workspaceKeys = wicketCacheKeys.computeIfAbsent(workspace,
+                ignored -> new ConcurrentHashMap<WicketCacheIdentity, String>());
+        String previousKey = workspaceKeys.put(identity, currentKey);
+        if (previousKey != null && !previousKey.equals(currentKey)) {
+            retireWicketCacheKey(previousKey);
+        }
+
+        if (wicketCacheKeys.get(workspace) != workspaceKeys && workspaceKeys.remove(identity, currentKey)) {
+            // The workspace was invalidated while this request calculated its key. Its content hash keeps the
+            // request correct; retire the detached key on the next request so it cannot accumulate in Wicket.
+            retireWicketCacheKey(currentKey);
+        }
+        if (retiredWicketCacheKeysSinceClear.get() >= WICKET_CACHE_CLEAR_THRESHOLD) {
+            drainRetiredWicketCacheKeys();
+        }
+        return currentKey;
+    }
+
+    private void retireWicketCacheKeys(String workspace, String nodeId) {
+        ConcurrentMap<WicketCacheIdentity, String> workspaceKeys = wicketCacheKeys.get(workspace);
+        if (workspaceKeys == null) {
+            return;
+        }
+        for (ConcurrentMap.Entry<WicketCacheIdentity, String> entry : workspaceKeys.entrySet()) {
+            WicketCacheIdentity identity = entry.getKey();
+            String wicketCacheKey = entry.getValue();
+            if (nodeId.equals(identity.nodeId) && workspaceKeys.remove(identity, wicketCacheKey)) {
+                retireWicketCacheKey(wicketCacheKey);
+            }
+        }
+    }
+
+    private void retireWicketCacheKey(String cacheKey) {
+        retiredWicketCacheKeys.add(cacheKey);
+        retiredWicketCacheKeysSinceClear.incrementAndGet();
+    }
+
+    private void drainRetiredWicketCacheKeys() {
+        if (!drainingRetiredWicketCacheKeys.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            long retiredSinceClear = retiredWicketCacheKeysSinceClear.get();
+            if (retiredSinceClear >= WICKET_CACHE_CLEAR_THRESHOLD && wicketMarkupCacheClearer.getAsBoolean()) {
+                // Preserve retirements that raced with the clear. Over-counting keys retired during the clear is safe
+                // and merely causes the next preventive clear to happen a little earlier.
+                retiredWicketCacheKeysSinceClear.addAndGet(-retiredSinceClear);
+                log.warn("Cleared Wicket markup cache after {} retired Brix markup keys to prevent unbounded "
+                        + "revision-key growth", retiredSinceClear);
+            }
+
+            String cacheKey = retiredWicketCacheKeys.peek();
+            while (cacheKey != null && wicketMarkupRemover.remove(cacheKey)) {
+                retiredWicketCacheKeys.poll();
+                cacheKey = retiredWicketCacheKeys.peek();
+            }
+        } finally {
+            drainingRetiredWicketCacheKeys.set(false);
+        }
+    }
+
+    private static boolean removeWicketMarkup(String cacheKey) {
+        if (!Application.exists()) {
+            return false;
+        }
+        try {
+            org.apache.wicket.markup.MarkupCache.get().removeMarkup(cacheKey);
+            return true;
+        } catch (RuntimeException e) {
+            // Cache cleanup is best effort and must never fail page rendering. A later request retries the key.
+            return false;
+        }
+    }
+
+    private static boolean clearWicketMarkupCache() {
+        if (!Application.exists()) {
+            return false;
+        }
+        try {
+            org.apache.wicket.markup.MarkupCache.get().clear();
+            return true;
+        } catch (RuntimeException e) {
+            // A later request retries the preventive clear.
+            return false;
+        }
     }
 
     /**
@@ -106,11 +237,78 @@ public class MarkupCache {
         return new CacheKey(container.getClass().getName(), nodeId);
     }
 
-    private String getNodeId(BrixNode node) {
+    static String getNodeId(BrixNode node) {
         if (node.isNodeType("mix:referenceable")) {
             return node.getIdentifier();
         }
         return node.getPath();
+    }
+
+    @FunctionalInterface
+    interface WicketMarkupRemover {
+        boolean remove(String cacheKey);
+    }
+
+    private static class WicketCacheIdentity {
+        private final String nodeId;
+        private final String componentClass;
+        private final String locale;
+        private final String style;
+        private final String variation;
+        private final String markupType;
+
+        private WicketCacheIdentity(String nodeId, String componentClass, String locale, String style,
+                                    String variation, String markupType) {
+            this.nodeId = Objects.requireNonNull(nodeId, "nodeId");
+            this.componentClass = Objects.requireNonNull(componentClass, "componentClass");
+            this.locale = locale;
+            this.style = style;
+            this.variation = variation;
+            this.markupType = markupType;
+        }
+
+        private String toWicketCacheKey(String workspace, String markupHash) {
+            StringBuilder key = new StringBuilder("brix-markup:v1:");
+            appendPart(key, workspace);
+            appendPart(key, nodeId);
+            appendPart(key, componentClass);
+            appendPart(key, locale);
+            appendPart(key, style);
+            appendPart(key, variation);
+            appendPart(key, markupType);
+            appendPart(key, markupHash);
+            return key.toString();
+        }
+
+        private static void appendPart(StringBuilder target, String value) {
+            if (value == null) {
+                target.append("-:");
+            } else {
+                target.append(value.length()).append(':').append(value).append(':');
+            }
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof WicketCacheIdentity)) {
+                return false;
+            }
+            WicketCacheIdentity identity = (WicketCacheIdentity) other;
+            return Objects.equals(nodeId, identity.nodeId)
+                    && Objects.equals(componentClass, identity.componentClass)
+                    && Objects.equals(locale, identity.locale)
+                    && Objects.equals(style, identity.style)
+                    && Objects.equals(variation, identity.variation)
+                    && Objects.equals(markupType, identity.markupType);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(nodeId, componentClass, locale, style, variation, markupType);
+        }
     }
 
     private static class CacheKey {

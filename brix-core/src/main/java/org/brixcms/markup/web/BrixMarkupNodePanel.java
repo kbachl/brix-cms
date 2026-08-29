@@ -43,23 +43,29 @@ public abstract class BrixMarkupNodePanel extends BrixGenericPanel<BrixNode> imp
         super(id, model);
     }
 
-    public MarkupHelper getMarkupHelper() {
+    private MarkupHelper getOrCreateMarkupHelper() {
+        if (markupHelper == null) {
+            markupHelper = new MarkupHelper(this);
+        }
         return markupHelper;
     }
 
+    public MarkupHelper getMarkupHelper() {
+        return getOrCreateMarkupHelper();
+    }
 
     public String getCacheKey(MarkupContainer container, Class<?> containerClass) {
-        return null;
+        return getOrCreateMarkupHelper().getCacheKey(container, containerClass);
     }
 
 
     public IResourceStream getMarkupResourceStream(MarkupContainer container, Class<?> containerClass) {
-        return new StringResourceStream(markupHelper.getMarkup(), "text/html");
+        return new StringResourceStream(getOrCreateMarkupHelper().getMarkup(), "text/html");
     }
 
     @Override
     protected void onInitialize() {
-        this.markupHelper = new MarkupHelper(this);
+        getOrCreateMarkupHelper();
         super.onInitialize();
     }
 

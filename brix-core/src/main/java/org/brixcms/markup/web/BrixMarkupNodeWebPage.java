@@ -54,7 +54,7 @@ public abstract class BrixMarkupNodeWebPage extends BrixNodeWebPage implements I
 
 
     public String getCacheKey(MarkupContainer container, Class<?> containerClass) {
-        return null;
+        return getMarkupHelper().getCacheKey(container, containerClass);
     }
 
 

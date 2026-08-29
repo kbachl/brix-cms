@@ -50,9 +50,9 @@ public class TileTag extends SimpleTag
     private final String tileName;
 
     private final BrixNodeModel tileContainerNodeModel;
-    private String tileContainerKey;
+    private final String tileContainerKey;
 
-    private String id;
+    private final String id;
 
     /**
      * Constructor
@@ -67,6 +67,8 @@ public class TileTag extends SimpleTag
         this.tileName = tileName;
         tileContainerNodeModel = new BrixNodeModel(tileContainerNode);
         tileContainerNodeModel.detach();
+        tileContainerKey = tileContainerNodeModel.getCacheKey();
+        id = PREFIX + atomicLong.incrementAndGet();
     }
 
     /**
@@ -100,9 +102,6 @@ public class TileTag extends SimpleTag
      * return unique id of this tag
      */
     public String getUniqueTagId() {
-        if (id == null) {
-            id = PREFIX + atomicLong.incrementAndGet();
-        }
         return id;
     }
 
@@ -143,8 +142,13 @@ public class TileTag extends SimpleTag
                 return cached;
             }
         }
-        AbstractContainer container = (AbstractContainer) tileContainerNodeModel.getObject();
-        tileContainerNodeModel.detach();
+        BrixNodeModel requestModel = new BrixNodeModel(tileContainerNodeModel);
+        AbstractContainer container;
+        try {
+            container = (AbstractContainer) requestModel.getObject();
+        } finally {
+            requestModel.detach();
+        }
         if (cycle != null && containerKey != null) {
             Map<String, AbstractContainer> cache = cycle.getMetaData(CONTAINER_CACHE_KEY);
             if (cache != null) {
@@ -206,9 +210,6 @@ public class TileTag extends SimpleTag
     }
 
     private String getTileContainerKey() {
-        if (tileContainerKey == null) {
-            tileContainerKey = tileContainerNodeModel.getCacheKey();
-        }
         return tileContainerKey;
     }
 

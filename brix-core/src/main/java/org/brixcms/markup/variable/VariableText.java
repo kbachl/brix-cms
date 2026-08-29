@@ -33,8 +33,9 @@ public class VariableText implements Text, VariableKeyProvider {
 
 
     public String getText() {
-        BrixNode node = pageNodeModel.getObject();
+        BrixNodeModel<BrixNode> requestModel = new BrixNodeModel<>(pageNodeModel);
         try {
+            BrixNode node = requestModel.getObject();
             if (node instanceof VariableValueProvider provider) {
                 String value = provider.getVariableValue(key);
                 return value != null ? value : "[" + key + "]";
@@ -42,7 +43,7 @@ public class VariableText implements Text, VariableKeyProvider {
                 return "Couldn't resolve variable '" + key + "'";
             }
         } finally {
-            pageNodeModel.detach();
+            requestModel.detach();
         }
     }
 

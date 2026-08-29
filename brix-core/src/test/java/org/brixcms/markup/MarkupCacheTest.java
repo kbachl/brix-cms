@@ -23,11 +23,18 @@ import static org.junit.Assert.assertTrue;
 
 import javax.jcr.Node;
 import javax.jcr.observation.EventIterator;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.wicket.model.IModel;
@@ -49,6 +56,115 @@ import org.easymock.EasyMock;
 import org.junit.Test;
 
 public class MarkupCacheTest {
+    @Test
+    public void unchangedMarkupUsesTheSameWicketCacheKey() {
+        MarkupCache cache = new MarkupCache(cacheKey -> true);
+
+        String first = wicketCacheKey(cache, "production", "page-id", "markup-hash");
+        String second = wicketCacheKey(cache, "production", "page-id", "markup-hash");
+
+        assertEquals(first, second);
+    }
+
+    @Test
+    public void changedMarkupGetsANewWicketCacheKeyAndRetiresTheOldOne() {
+        List<String> removedKeys = new ArrayList<String>();
+        MarkupCache cache = new MarkupCache(cacheKey -> {
+            removedKeys.add(cacheKey);
+            return true;
+        });
+
+        String oldKey = wicketCacheKey(cache, "production", "page-id", "old-markup-hash");
+        String currentKey = wicketCacheKey(cache, "production", "page-id", "current-markup-hash");
+        assertFalse(oldKey.equals(currentKey));
+        assertTrue(removedKeys.isEmpty());
+
+        wicketCacheKey(cache, "production", "page-id", "current-markup-hash");
+        assertEquals(Collections.singletonList(oldKey), removedKeys);
+    }
+
+    @Test
+    public void identicalNodesAndMarkupInDifferentWorkspacesDoNotShareAWicketCacheKey() {
+        MarkupCache cache = new MarkupCache(cacheKey -> true);
+
+        String production = wicketCacheKey(cache, "production", "page-id", "markup-hash");
+        String preview = wicketCacheKey(cache, "preview", "page-id", "markup-hash");
+
+        assertFalse(production.equals(preview));
+    }
+
+    @Test
+    public void targetedAndWorkspaceInvalidationRetireRegisteredWicketCacheKeys() {
+        List<String> removedKeys = new ArrayList<String>();
+        MarkupCache cache = new MarkupCache(cacheKey -> {
+            removedKeys.add(cacheKey);
+            return true;
+        });
+        String productionPage = wicketCacheKey(cache, "production", "page-id", "markup-hash");
+        String productionOtherPage = wicketCacheKey(cache, "production", "other-page-id", "markup-hash");
+        String previewPage = wicketCacheKey(cache, "preview", "page-id", "markup-hash");
+
+        cache.invalidate("production", "page-id");
+        wicketCacheKey(cache, "production", "other-page-id", "markup-hash");
+        assertTrue(removedKeys.contains(productionPage));
+        assertFalse(removedKeys.contains(productionOtherPage));
+        assertFalse(removedKeys.contains(previewPage));
+
+        cache.invalidateWorkspace("preview");
+        wicketCacheKey(cache, "production", "other-page-id", "markup-hash");
+        assertTrue(removedKeys.contains(previewPage));
+        assertFalse(removedKeys.contains(productionOtherPage));
+    }
+
+    @Test
+    public void concurrentAccessPublishesOneStableWicketCacheKey() throws Exception {
+        MarkupCache cache = new MarkupCache(cacheKey -> true);
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<String>> futures = new ArrayList<Future<String>>();
+        try {
+            for (int i = 0; i < 64; i++) {
+                futures.add(executor.submit(() -> {
+                    start.await();
+                    return wicketCacheKey(cache, "production", "page-id", "markup-hash");
+                }));
+            }
+            start.countDown();
+
+            Set<String> keys = new HashSet<String>();
+            for (Future<String> future : futures) {
+                keys.add(future.get(5, TimeUnit.SECONDS));
+            }
+            assertEquals(1, keys.size());
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    public void markupHashUsesSha256OfUtf8Markup() {
+        assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                MarkupHelper.sha256("abc"));
+    }
+
+    @Test
+    public void clearsTheCompleteWicketCacheAfterOneHundredThousandRetiredKeys() {
+        AtomicInteger clearCount = new AtomicInteger();
+        MarkupCache cache = new MarkupCache(cacheKey -> true, () -> {
+            clearCount.incrementAndGet();
+            return true;
+        });
+
+        wicketCacheKey(cache, "production", "page-id", "markup-hash-0");
+        for (int revision = 1; revision <= 100_000; revision++) {
+            wicketCacheKey(cache, "production", "page-id", "markup-hash-" + revision);
+        }
+
+        assertEquals(1, clearCount.get());
+        wicketCacheKey(cache, "production", "page-id", "markup-hash-100000");
+        assertEquals(1, clearCount.get());
+    }
+
     @Test
     public void invalidateWorkspaceRemovesOnlyMarkupFromThatWorkspace() {
         MarkupCache cache = new MarkupCache();
@@ -184,6 +300,11 @@ public class MarkupCacheTest {
         EasyMock.expect(workspace.getName()).andReturn(workspaceName).anyTimes();
         EasyMock.replay(session, workspace);
         return new TestNode(session, identifier);
+    }
+
+    private static String wicketCacheKey(MarkupCache cache, String workspace, String nodeId, String markupHash) {
+        return cache.getWicketCacheKey(workspace, nodeId, "org.brixcms.TestPage", "en", null, null, "html",
+                markupHash);
     }
 
     private static TestContainerNode containerNodeInWorkspace(String workspaceName, String identifier, String path) {

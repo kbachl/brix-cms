@@ -43,12 +43,13 @@ class GeneratedMarkup {
             throw new IllegalArgumentException("Argument 'markupSource' may not be null.");
         }
         this.expirationToken = markupSource.getExpirationToken();
-        items = new ArrayList<Item>();
+        List<Item> generatedItems = new ArrayList<Item>();
         Item item = markupSource.nextMarkupItem();
         while (item != null) {
-            items.add(item);
+            generatedItems.add(item);
             item = markupSource.nextMarkupItem();
         }
+        items = List.copyOf(generatedItems);
         this.doctype = markupSource.getDoctype();
     }
 }

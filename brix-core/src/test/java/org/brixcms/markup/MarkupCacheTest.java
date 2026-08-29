@@ -184,6 +184,18 @@ public class MarkupCacheTest {
     }
 
     @Test
+    public void generatedMarkupCarriesItsResolvedCacheIdentity() {
+        MarkupCache cache = new MarkupCache();
+        TestComponent component = new TestComponent(nodeInWorkspace("production", "page-id"),
+                new TestMarkupSource());
+
+        GeneratedMarkup markup = cache.getMarkup(component);
+
+        assertEquals("production", markup.workspace);
+        assertEquals("page-id", markup.nodeId);
+    }
+
+    @Test
     public void invalidateWorkspaceDetachesAnInFlightMarkupPopulation() throws Exception {
         MarkupCache cache = new MarkupCache();
         BlockingMarkupSource oldSource = new BlockingMarkupSource();

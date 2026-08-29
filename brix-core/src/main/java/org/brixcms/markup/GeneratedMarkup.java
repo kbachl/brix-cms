@@ -33,15 +33,23 @@ class GeneratedMarkup {
 
     final String doctype;
 
+    final String workspace;
+
+    final String nodeId;
+
     /**
      * Creates new {@link GeneratedMarkup} instance from given {@link MarkupSource}.
      *
      * @param markupSource
+     * @param workspace workspace used to cache the generated markup
+     * @param nodeId stable node identity used to cache the generated markup
      */
-    public GeneratedMarkup(MarkupSource markupSource) {
+    public GeneratedMarkup(MarkupSource markupSource, String workspace, String nodeId) {
         if (markupSource == null) {
             throw new IllegalArgumentException("Argument 'markupSource' may not be null.");
         }
+        this.workspace = workspace;
+        this.nodeId = nodeId;
         this.expirationToken = markupSource.getExpirationToken();
         List<Item> generatedItems = new ArrayList<Item>();
         Item item = markupSource.nextMarkupItem();

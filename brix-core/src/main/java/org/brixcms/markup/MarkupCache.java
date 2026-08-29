@@ -79,7 +79,8 @@ public class MarkupCache {
         String workspace = node.getSession().getWorkspace().getName();
         ConcurrentMap<CacheKey, GeneratedMarkup> cache = getWorkspaceCache(workspace);
         CacheKey key = getKey(container, node);
-        return cache.computeIfAbsent(key, ignored -> new GeneratedMarkup(provider.getMarkupSource()));
+        return cache.computeIfAbsent(key,
+                ignored -> new GeneratedMarkup(provider.getMarkupSource(), workspace, key.nodeId));
     }
 
     public void invalidate(BrixNode node) {

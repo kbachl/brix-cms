@@ -123,8 +123,7 @@ public class SitePlugin implements SessionAwarePlugin {
     private MarkupCache markupCache = new MarkupCache();
 
     private WebDavEventListener webDavEventListener = new WebDavEventListener();
-    private volatile Collection<SiteNodePlugin> nodePluginsCache;
-    private volatile Map<String, SiteNodePlugin> nodePluginByTypeCache;
+    private volatile NodePluginCache nodePluginCache;
 
     public static SitePlugin get() {
         return get(Brix.get());
@@ -454,40 +453,47 @@ public class SitePlugin implements SessionAwarePlugin {
     }
 
     public Collection<SiteNodePlugin> getNodePlugins() {
-        Collection<SiteNodePlugin> cache = nodePluginsCache;
-        if (cache == null) {
-            synchronized (this) {
-                cache = nodePluginsCache;
-                if (cache == null) {
-                    Collection<SiteNodePlugin> plugins = brix.getConfig().getRegistry().lookupCollection(
-                            SiteNodePlugin.POINT);
-                    cache = List.copyOf(plugins);
-                    nodePluginsCache = cache;
-
-                    Map<String, SiteNodePlugin> byType = new HashMap<String, SiteNodePlugin>(cache.size());
-                    for (SiteNodePlugin plugin : cache) {
-                        byType.putIfAbsent(plugin.getNodeType(), plugin);
-                    }
-                    nodePluginByTypeCache = Collections.unmodifiableMap(byType);
-                }
-            }
-        }
-        return cache;
+        return getNodePluginCache().plugins;
     }
 
     private Map<String, SiteNodePlugin> getNodePluginsByType() {
-        Map<String, SiteNodePlugin> byType = nodePluginByTypeCache;
-        if (byType == null) {
-            getNodePlugins();
-            byType = nodePluginByTypeCache;
+        return getNodePluginCache().byType;
+    }
+
+    private NodePluginCache getNodePluginCache() {
+        NodePluginCache cache = nodePluginCache;
+        if (cache == null) {
+            synchronized (this) {
+                cache = nodePluginCache;
+                if (cache == null) {
+                    cache = new NodePluginCache(brix.getConfig().getRegistry().lookupCollection(
+                            SiteNodePlugin.POINT));
+                    // Publish the list and type map together, only after both are complete.
+                    nodePluginCache = cache;
+                }
+            }
         }
-        return byType;
+        // Keep this snapshot even if a registry event invalidates the shared reference.
+        return cache;
     }
 
     private void invalidateNodePluginCache() {
         synchronized (this) {
-            nodePluginsCache = null;
-            nodePluginByTypeCache = null;
+            nodePluginCache = null;
+        }
+    }
+
+    private static final class NodePluginCache {
+        private final List<SiteNodePlugin> plugins;
+        private final Map<String, SiteNodePlugin> byType;
+
+        private NodePluginCache(Collection<SiteNodePlugin> plugins) {
+            this.plugins = List.copyOf(plugins);
+            Map<String, SiteNodePlugin> byType = new HashMap<String, SiteNodePlugin>(this.plugins.size());
+            for (SiteNodePlugin plugin : this.plugins) {
+                byType.putIfAbsent(plugin.getNodeType(), plugin);
+            }
+            this.byType = Collections.unmodifiableMap(byType);
         }
     }
 

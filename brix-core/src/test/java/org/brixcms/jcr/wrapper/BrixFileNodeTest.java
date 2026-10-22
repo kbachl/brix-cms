@@ -19,6 +19,8 @@ import javax.jcr.RepositoryException;
 import javax.jcr.Session;
 import javax.jcr.SimpleCredentials;
 import javax.jcr.Workspace;
+import javax.jcr.nodetype.NodeTypeManager;
+import javax.jcr.nodetype.NodeTypeTemplate;
 
 import org.apache.jackrabbit.api.JackrabbitRepository;
 import org.apache.jackrabbit.core.RepositoryImpl;
@@ -83,6 +85,53 @@ public class BrixFileNodeTest {
         if (home != null) {
             delete(home);
         }
+    }
+
+    @Test
+    public void isFileNodeAcceptsExactFileTypeWithContent() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrNode node = login().getRootNode().addNode("file", "nt:file");
+        node.addNode("jcr:content", "nt:resource");
+
+        assertTrue(BrixFileNode.isFileNode(node));
+    }
+
+    @Test
+    public void isFileNodeRejectsFileWithoutContent() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrNode node = login().getRootNode().addNode("file", "nt:file");
+
+        assertFalse(BrixFileNode.isFileNode(node));
+    }
+
+    @Test
+    public void isFileNodeRejectsOtherPrimaryTypeWithContent() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrNode node = login().getRootNode().addNode("other", "nt:unstructured");
+        node.addNode("jcr:content", "nt:resource");
+
+        assertFalse(BrixFileNode.isFileNode(node));
+    }
+
+    @Test
+    public void isFileNodeRejectsFileSubtypeWithContent() throws IOException, RepositoryException {
+        setupRepository();
+
+        JcrSession session = login();
+        NodeTypeManager manager = session.getWorkspace().getNodeTypeManager();
+        NodeTypeTemplate subtype = manager.createNodeTypeTemplate();
+        subtype.setName("brix:fileSubtype");
+        subtype.setDeclaredSuperTypeNames(new String[] { "nt:file" });
+        manager.registerNodeType(subtype, false);
+
+        JcrNode node = session.getRootNode().addNode("subtype", "brix:fileSubtype");
+        node.addNode("jcr:content", "nt:resource");
+
+        assertTrue(node.isNodeType("nt:file"));
+        assertFalse(BrixFileNode.isFileNode(node));
     }
 
     @Test

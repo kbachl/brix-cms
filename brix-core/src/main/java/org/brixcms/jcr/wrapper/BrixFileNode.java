@@ -57,11 +57,9 @@ public class BrixFileNode extends BrixNode {
      * @return <code>true</code> if the node is a file node, <code>false</code> otherwise
      */
     public static boolean isFileNode(JcrNode node) {
-        if (!node.getPrimaryNodeType().getName().equals("nt:file")) {
-            return false;
-        }
-
-        return node.hasNode("jcr:content");
+        // Read the mandatory type name directly to avoid ModeShape's session-specific NodeType allocations.
+        return "nt:file".equals(node.getProperty("jcr:primaryType").getString())
+                && node.hasNode("jcr:content");
     }
 
     /**

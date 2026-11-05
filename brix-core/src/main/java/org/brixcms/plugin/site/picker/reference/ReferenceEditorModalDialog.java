@@ -15,29 +15,22 @@
 package org.brixcms.plugin.site.picker.reference;
 
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.core.request.handler.IPartialPageRequestHandler;
+import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.ResourceModel;
+import org.brixcms.web.BrixModalDialog;
 import org.brixcms.web.generic.IGenericComponent;
 import org.brixcms.web.reference.Reference;
-import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
-public class ReferenceEditorModalWindow extends ModalWindow implements IGenericComponent<Reference> {
+public class ReferenceEditorModalDialog extends BrixModalDialog implements IGenericComponent<Reference> {
     private final ReferenceEditorConfiguration configuration;
 
-    public ReferenceEditorModalWindow(String id, IModel<Reference> model, ReferenceEditorConfiguration configuration) {
+    public ReferenceEditorModalDialog(String id, IModel<Reference> model, ReferenceEditorConfiguration configuration) {
         super(id);
         setModel(model);
 
         this.configuration = configuration;
 
-        setWidthUnit("vw");
-        setInitialWidth(70);
-        setHeightUnit("vh");
-        setInitialHeight(70);
-        setUseInitialHeight(true);
-        setResizable(false);
-        setCookieName("reference-editor");
         setTitle(new ResourceModel("title"));
     }
 
@@ -54,27 +47,27 @@ public class ReferenceEditorModalWindow extends ModalWindow implements IGenericC
     }
 
     @Override
-    public void show(IPartialPageRequestHandler target) {
-        if (isShown() == false) {
-            initContent();
+    public ModalDialog open(AjaxRequestTarget target) {
+        if (!isOpen()) {
+            return super.open(newContent(), target);
         }
-        super.show(target);
+        return super.open(target);
     }
 
-    private void initContent() {
-        setContent(new ReferenceEditorWithButtons(getContentId(), getModel(), configuration) {
+    private ReferenceEditorWithButtons newContent() {
+        return new ReferenceEditorWithButtons(CONTENT_ID, getModel(), configuration) {
             @Override
             protected void onCancel(AjaxRequestTarget target) {
                 super.onCancel(target);
-                ReferenceEditorModalWindow.this.onCancel(target);
+                ReferenceEditorModalDialog.this.onCancel(target);
             }
 
             @Override
             protected void onOk(AjaxRequestTarget target) {
                 super.onOk(target);
-                ReferenceEditorModalWindow.this.onOk(target);
+                ReferenceEditorModalDialog.this.onOk(target);
             }
-        });
+        };
     }
 
     @SuppressWarnings("unchecked")

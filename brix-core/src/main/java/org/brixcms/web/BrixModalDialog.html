@@ -1,0 +1,15 @@
+<wicket:panel xmlns:wicket="http://wicket.apache.org">
+    <div wicket:id="overlay" class="brix-modal-overlay" role="dialog" aria-modal="true">
+        <div class="brix-modal-dialog">
+            <div class="brix-modal-header">
+                <h2 wicket:id="title" class="brix-modal-title"></h2>
+                <button wicket:id="close" type="button" class="brix-modal-close" wicket:message="aria-label:close,title:close">
+                    <span aria-hidden="true">&#215;</span>
+                </button>
+            </div>
+            <div wicket:id="dialog" class="brix-modal-body">
+                <div wicket:id="content"></div>
+            </div>
+        </div>
+    </div>
+</wicket:panel>

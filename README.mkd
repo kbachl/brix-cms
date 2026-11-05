@@ -36,6 +36,21 @@ Building Brix requires Java 25 and Maven 3.6.3 or newer. Run `mvn clean install`
 - How to [run the demo](https://github.com/brix-cms/brix-cms/wiki/RunningTheDemo)
 - How to [create a custom tile](https://github.com/brix-cms/brix-cms/wiki/GuestBookTileTutorial)
 
+Migrating custom modal dialogs
+-----------------------------
+
+Brix uses Wicket's `ModalDialog`; the `wicketstuff-modalwindow9` dependency is no longer required.
+Custom integrations must rename `NodePickerModalWindow` / `ReferenceEditorModalWindow` to
+`NodePickerModalDialog` / `ReferenceEditorModalDialog`, and picker overrides of `newModalWindow`,
+`getModalWindow` and `MODAL_WINDOW_ID` to `newModalDialog`, `getModalDialog` and `MODAL_DIALOG_ID`.
+Custom markup uses `modalDialog` instead of `modalWindow` (and `modalDialogForm` in the prototype manager).
+Use `open(AjaxRequestTarget)`, `isOpen()` and `ModalDialog.CONTENT_ID` instead of `show`, `isShown`
+and `getContentId`. Override `close(AjaxRequestTarget)` for close notifications, calling `super.close(target)`.
+`BrixModalDialog` supplies the shared title, close button and CSS sizing; the old dragging, resizing and
+position-cookie APIs are gone. Existing serialized Wicket pages must be discarded when upgrading.
+
+Run the additional keyboard regression check with `node brix-core/src/test/js/modal-dialog-focus-test.cjs`.
+
 Community
 ---------
 - Mailing List/Google Group: http://groups.google.com/group/brix-cms-discuss

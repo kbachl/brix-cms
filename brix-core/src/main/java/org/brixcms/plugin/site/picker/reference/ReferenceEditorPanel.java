@@ -17,16 +17,16 @@ package org.brixcms.plugin.site.picker.reference;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.PropertyModel;
 import org.brixcms.web.reference.Reference;
 import org.brixcms.web.util.DisabledClassAppender;
-import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class ReferenceEditorPanel extends FormComponentPanel<Reference> {
-    protected static final String MODAL_WINDOW_ID = "modalWindow";
+    protected static final String MODAL_DIALOG_ID = "modalDialog";
 
     private ReferenceEditorConfiguration configuration;
 
@@ -59,8 +59,8 @@ public class ReferenceEditorPanel extends FormComponentPanel<Reference> {
         return true;
     }
 
-    protected ReferenceEditorModalWindow getModalWindow() {
-        return (ReferenceEditorModalWindow) get(MODAL_WINDOW_ID);
+    protected ReferenceEditorModalDialog getModalDialog() {
+        return (ReferenceEditorModalDialog) get(MODAL_DIALOG_ID);
     }
 
     @Override
@@ -77,7 +77,7 @@ public class ReferenceEditorPanel extends FormComponentPanel<Reference> {
     }
 
     private void init() {
-        add(newModalWindow(MODAL_WINDOW_ID));
+        add(newModalDialog(MODAL_DIALOG_ID));
         final Label label = new Label("label", newLabelModel()) {
             @Override
             public boolean isVisible() {
@@ -91,14 +91,8 @@ public class ReferenceEditorPanel extends FormComponentPanel<Reference> {
         add(new AjaxLink<Void>("edit") {
             @Override
             public void onClick(AjaxRequestTarget target) {
-                getModalWindow().setModel(ReferenceEditorPanel.this.getModel());
-                getModalWindow().setWindowClosedCallback(new ModalWindow.WindowClosedCallback() {
-                    public void onClose(AjaxRequestTarget target) {
-                        target.add(ReferenceEditorPanel.this);
-                        ReferenceEditorPanel.this.onUpdate(target);
-                    }
-                });
-                getModalWindow().show(target);
+                getModalDialog().setModel(ReferenceEditorPanel.this.getModel());
+                getModalDialog().open(target);
             }
         });
 
@@ -122,12 +116,25 @@ public class ReferenceEditorPanel extends FormComponentPanel<Reference> {
         }.add(new DisabledClassAppender()));
     }
 
-    protected Component newModalWindow(String id) {
+    protected Component newModalDialog(String id) {
         ReferenceEditorConfiguration conf = getConfiguration();
         if (conf == null) {
             throw new IllegalStateException("ReferenceEditorPanel must have configuration.");
         }
-        return new ReferenceEditorModalWindow(id, getModel(), getConfiguration());
+        return new ReferenceEditorModalDialog(id, getModel(), getConfiguration()) {
+            @Override
+            public ModalDialog close(AjaxRequestTarget target) {
+                if (isOpen()) {
+                    super.close(target);
+                    if (target != null) {
+                        target.add(ReferenceEditorPanel.this);
+                        ReferenceEditorPanel.this.onUpdate(target);
+                        target.focusComponent(ReferenceEditorPanel.this.get("edit"));
+                    }
+                }
+                return this;
+            }
+        };
     }
 
     protected IModel<String> newLabelModel() {

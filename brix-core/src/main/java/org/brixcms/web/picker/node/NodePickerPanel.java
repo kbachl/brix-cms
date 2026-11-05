@@ -17,6 +17,7 @@ package org.brixcms.web.picker.node;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.FormComponentPanel;
 import org.apache.wicket.model.IModel;
@@ -27,10 +28,9 @@ import org.brixcms.plugin.site.SitePlugin;
 import org.brixcms.web.tree.JcrTreeNode;
 import org.brixcms.web.tree.NodeFilter;
 import org.brixcms.web.util.DisabledClassAppender;
-import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class NodePickerPanel extends FormComponentPanel<BrixNode> {
-    protected static final String MODAL_WINDOW_ID = "modalWindow";
+    protected static final String MODAL_DIALOG_ID = "modalDialog";
     private final JcrTreeNode rootNode;
     private final NodeFilter enabledFilter;
     private final NodeFilter visibilityFilter;
@@ -77,8 +77,8 @@ public class NodePickerPanel extends FormComponentPanel<BrixNode> {
         return true;
     }
 
-    protected NodePickerModalWindow getModalWindow() {
-        return (NodePickerModalWindow) get(MODAL_WINDOW_ID);
+    protected NodePickerModalDialog getModalDialog() {
+        return (NodePickerModalDialog) get(MODAL_DIALOG_ID);
     }
 
     @Override
@@ -95,7 +95,7 @@ public class NodePickerPanel extends FormComponentPanel<BrixNode> {
     }
 
     private void init() {
-        add(newModalWindow(MODAL_WINDOW_ID));
+        add(newModalDialog(MODAL_DIALOG_ID));
         final Label label = new Label("label", newLabelModel()) {
             @Override
             public boolean isVisible() {
@@ -108,14 +108,8 @@ public class NodePickerPanel extends FormComponentPanel<BrixNode> {
         add(new AjaxLink<Void>("edit") {
             @Override
             public void onClick(AjaxRequestTarget target) {
-                getModalWindow().setModel(NodePickerPanel.this.getModel());
-                getModalWindow().setWindowClosedCallback(new ModalWindow.WindowClosedCallback() {
-                    public void onClose(AjaxRequestTarget target) {
-                        target.add(NodePickerPanel.this);
-                        NodePickerPanel.this.onUpdate(target);
-                    }
-                });
-                getModalWindow().show(target);
+                getModalDialog().setModel(NodePickerPanel.this.getModel());
+                getModalDialog().open(target);
             }
         });
 
@@ -134,8 +128,21 @@ public class NodePickerPanel extends FormComponentPanel<BrixNode> {
         }.add(new DisabledClassAppender()));
     }
 
-    protected Component newModalWindow(String id) {
-        return new NodePickerModalWindow(id, getModel(), rootNode, visibilityFilter, enabledFilter);
+    protected Component newModalDialog(String id) {
+        return new NodePickerModalDialog(id, getModel(), rootNode, visibilityFilter, enabledFilter) {
+            @Override
+            public ModalDialog close(AjaxRequestTarget target) {
+                if (isOpen()) {
+                    super.close(target);
+                    if (target != null) {
+                        target.add(NodePickerPanel.this);
+                        NodePickerPanel.this.onUpdate(target);
+                        target.focusComponent(NodePickerPanel.this.get("edit"));
+                    }
+                }
+                return this;
+            }
+        };
     }
 
     protected IModel<String> newLabelModel() {

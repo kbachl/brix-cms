@@ -1,0 +1,52 @@
+.brix-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.brix-modal-dialog {
+    display: flex;
+    flex-direction: column;
+    width: 70vw;
+    height: 70vh;
+    max-width: calc(100vw - 2rem);
+    max-height: calc(100vh - 2rem);
+    background: white;
+    color: #292b2c;
+    border: 1px solid #7894BB;
+    box-shadow: 0 0 30px rgba(0, 0, 0, 0.4);
+}
+
+.brix-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 1rem;
+    background: #7894BB;
+}
+
+.brix-modal-title {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+.brix-modal-close {
+    padding: 0 0.25rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.brix-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 1rem;
+}

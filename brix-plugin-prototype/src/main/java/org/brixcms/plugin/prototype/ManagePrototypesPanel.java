@@ -16,9 +16,11 @@ package org.brixcms.plugin.prototype;
 
 import java.util.List;
 
+import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
 import org.apache.wicket.ajax.markup.html.form.AjaxButton;
+import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.markup.html.form.Form;
 import org.apache.wicket.markup.html.form.TextField;
@@ -41,13 +43,14 @@ import org.brixcms.plugin.prototype.auth.CreatePrototypeAction;
 import org.brixcms.plugin.prototype.auth.DeletePrototypeAction;
 import org.brixcms.plugin.prototype.auth.RestorePrototypeAction;
 import org.brixcms.web.BrixFeedbackPanel;
+import org.brixcms.web.BrixModalDialog;
 import org.brixcms.web.generic.BrixGenericPanel;
 import org.brixcms.workspace.Workspace;
 import org.brixcms.workspace.WorkspaceModel;
-import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
     private String prototypeName;
+    private Component dialogOpener;
 
     public ManagePrototypesPanel(String id, final IModel<Workspace> model) {
         super(id, model);
@@ -61,18 +64,23 @@ public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
             }
         };
 
-        Form<Void> modalWindowForm = new Form<Void>("modalWindowForm");
-        add(modalWindowForm);
+        Form<Void> modalDialogForm = new Form<Void>("modalDialogForm");
+        add(modalDialogForm);
 
-        final ModalWindow modalWindow = new ModalWindow("modalWindow");
-        modalWindow.setInitialWidth(70);
-        modalWindow.setWidthUnit("vw");
-        modalWindow.setUseInitialHeight(true);
-        modalWindow.setInitialHeight(70);
-        modalWindow.setHeightUnit("vh");
-        modalWindow.setResizable(false);
-        modalWindow.setTitle(new ResourceModel("selectItems"));
-        modalWindowForm.add(modalWindow);
+        final BrixModalDialog modalDialog = new BrixModalDialog("modalDialog") {
+            @Override
+            public ModalDialog close(AjaxRequestTarget target) {
+                if (isOpen()) {
+                    super.close(target);
+                    if (target != null) {
+                        target.add(ManagePrototypesPanel.this);
+                        target.focusComponent(dialogOpener);
+                    }
+                }
+                return this;
+            }
+        };
+        modalDialogForm.add(modalDialog);
 
         add(new ListView<Workspace>("prototypes", prototypesModel) {
             @Override
@@ -98,10 +106,10 @@ public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
                     public void onClick(AjaxRequestTarget target) {
                         String prototypeId = item.getModelObject().getId();
                         String targetId = ManagePrototypesPanel.this.getModelObject().getId();
-                        Panel panel = new RestoreItemsPanel(modalWindow.getContentId(), prototypeId, targetId);
-                        modalWindow.setTitle(new ResourceModel("selectItems"));
-                        modalWindow.setContent(panel);
-                        modalWindow.show(target);
+                        Panel panel = new RestoreItemsPanel(ModalDialog.CONTENT_ID, prototypeId, targetId);
+                        modalDialog.setTitle(new ResourceModel("selectItems"));
+                        dialogOpener = this;
+                        modalDialog.open(panel, target);
                     }
 
                     @Override
@@ -152,16 +160,11 @@ public class ManagePrototypesPanel extends BrixGenericPanel<Workspace> {
             @Override
             public void onSubmit(AjaxRequestTarget target) {
                 String workspaceId = ManagePrototypesPanel.this.getModelObject().getId();
-                CreatePrototypePanel panel = new CreatePrototypePanel(modalWindow.getContentId(), workspaceId,
+                CreatePrototypePanel panel = new CreatePrototypePanel(ModalDialog.CONTENT_ID, workspaceId,
                         ManagePrototypesPanel.this.prototypeName);
-                modalWindow.setContent(panel);
-                modalWindow.setTitle(new ResourceModel("selectItemsToCreate"));
-                modalWindow.setWindowClosedCallback(new ModalWindow.WindowClosedCallback() {
-                    public void onClose(AjaxRequestTarget target) {
-                        target.add(ManagePrototypesPanel.this);
-                    }
-                });
-                modalWindow.show(target);
+                modalDialog.setTitle(new ResourceModel("selectItemsToCreate"));
+                dialogOpener = this;
+                modalDialog.open(panel, target);
             }
 
             @Override

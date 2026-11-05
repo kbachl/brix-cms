@@ -17,6 +17,7 @@ package org.brixcms.plugin.prototype;
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
 import org.apache.wicket.ajax.markup.html.AjaxLink;
+import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.markup.html.basic.MultiLineLabel;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.Model;
@@ -27,7 +28,6 @@ import org.brixcms.jcr.api.JcrNode;
 import org.brixcms.jcr.api.JcrWorkspace;
 import org.brixcms.jcr.wrapper.BrixNode;
 import org.brixcms.plugin.site.picker.node.SiteNodePickerPanel;
-import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
 import java.util.List;
 import java.util.Map;
@@ -64,7 +64,8 @@ public class RestoreItemsPanel extends SelectItemsPanel<Void> {
                             rootNode = targetWorkspace.getSession().getRootNode();
                         }
                         PrototypePlugin.get().restoreNodes(nodes, rootNode);
-                        findParent(ModalWindow.class).close(target);
+                        findParent(ModalDialog.class).close(target);
+                        return;
                     }
                 } else {
                     message.setDefaultModelObject("You have to select at least one node.");

@@ -15,21 +15,21 @@
 package org.brixcms.web.picker.node;
 
 import org.apache.wicket.ajax.AjaxRequestTarget;
-import org.apache.wicket.core.request.handler.IPartialPageRequestHandler;
+import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.model.IModel;
 import org.apache.wicket.model.ResourceModel;
 import org.brixcms.jcr.wrapper.BrixNode;
+import org.brixcms.web.BrixModalDialog;
 import org.brixcms.web.generic.IGenericComponent;
 import org.brixcms.web.tree.JcrTreeNode;
 import org.brixcms.web.tree.NodeFilter;
-import org.wicketstuff.modalwindow9.modal.ModalWindow;
 
-public class NodePickerModalWindow extends ModalWindow implements IGenericComponent<BrixNode> {
+public class NodePickerModalDialog extends BrixModalDialog implements IGenericComponent<BrixNode> {
     private final JcrTreeNode rootNode;
     private final NodeFilter enabledFilter;
     private final NodeFilter visibilityFilter;
 
-    public NodePickerModalWindow(String id, JcrTreeNode rootNode, NodeFilter visibilityFilter, NodeFilter enabledFilter) {
+    public NodePickerModalDialog(String id, JcrTreeNode rootNode, NodeFilter visibilityFilter, NodeFilter enabledFilter) {
         super(id);
 
         this.rootNode = rootNode;
@@ -39,9 +39,10 @@ public class NodePickerModalWindow extends ModalWindow implements IGenericCompon
         init();
     }
 
-    public NodePickerModalWindow(String id, IModel<BrixNode> model, JcrTreeNode rootNode, NodeFilter visibilityFilter,
+    public NodePickerModalDialog(String id, IModel<BrixNode> model, JcrTreeNode rootNode, NodeFilter visibilityFilter,
             NodeFilter enabledFilter) {
-        super(id, model);
+        super(id);
+        setModel(model);
 
         this.rootNode = rootNode;
         this.enabledFilter = enabledFilter;
@@ -51,12 +52,6 @@ public class NodePickerModalWindow extends ModalWindow implements IGenericCompon
     }
 
     private void init() {
-        setWidthUnit("vw");
-        setInitialWidth(70);
-        setUseInitialHeight(true);
-        setInitialHeight(70);
-        setHeightUnit("vh");
-        setResizable(false);
         setTitle(new ResourceModel("node-picker-title"));
     }
 
@@ -73,32 +68,32 @@ public class NodePickerModalWindow extends ModalWindow implements IGenericCompon
     }
 
     @Override
-    public void show(IPartialPageRequestHandler target) {
-        if (isShown() == false) {
-            initContent();
+    public ModalDialog open(AjaxRequestTarget target) {
+        if (!isOpen()) {
+            return super.open(newContent(), target);
         }
-        super.show(target);
+        return super.open(target);
     }
 
-    private void initContent() {
-        setContent(new NodePickerWithButtons(getContentId(), getModel(), rootNode, visibilityFilter, enabledFilter) {
+    private NodePickerWithButtons newContent() {
+        return new NodePickerWithButtons(CONTENT_ID, getModel(), rootNode, visibilityFilter, enabledFilter) {
             @Override
             protected void onCancel(AjaxRequestTarget target) {
                 super.onCancel(target);
-                NodePickerModalWindow.this.onCancel(target);
+                NodePickerModalDialog.this.onCancel(target);
             }
 
             @Override
             protected void onOk(AjaxRequestTarget target) {
                 super.onOk(target);
-                NodePickerModalWindow.this.onOk(target);
+                NodePickerModalDialog.this.onOk(target);
             }
 
             @Override
             public boolean isDisplayFiles() {
-                return NodePickerModalWindow.this.isDisplayFiles();
+                return NodePickerModalDialog.this.isDisplayFiles();
             }
-        });
+        };
     }
 
     @SuppressWarnings("unchecked")

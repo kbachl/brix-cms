@@ -32,11 +32,6 @@
 			<groupId>org.wicketstuff</groupId>
 			<artifactId>wicketstuff-inmethod-grid</artifactId>
 		</dependency>
-        <dependency>
-            <groupId>org.wicketstuff</groupId>
-            <artifactId>wicketstuff-modalwindow9</artifactId>
-            <version>10.6.0-SNAPSHOT</version>
-        </dependency>
 		<dependency>
 			<groupId>com.thoughtworks.xstream</groupId>
 			<artifactId>xstream</artifactId>
@@ -88,6 +83,19 @@
             <version>${jetty.version}</version>
         </dependency>
 		<!-- TESTING DEPENDENCIES -->
+		<dependency>
+			<groupId>org.apache.wicket</groupId>
+			<artifactId>wicket-tester</artifactId>
+			<version>${wicket.version}</version>
+			<scope>test</scope>
+			<exclusions>
+				<!-- Let Surefire select the JUnit 4 engine for the existing test suite. -->
+				<exclusion>
+					<groupId>org.junit.jupiter</groupId>
+					<artifactId>junit-jupiter-engine</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>

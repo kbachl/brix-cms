@@ -23,6 +23,7 @@ import java.util.List;
 
 import org.apache.wicket.Component;
 import org.apache.wicket.ajax.AjaxRequestTarget;
+import org.apache.wicket.settings.ExceptionSettings;
 import org.apache.wicket.util.tester.WicketTester;
 import org.brixcms.BrixNodeModel;
 import org.brixcms.web.picker.common.RootTreeNode;
@@ -34,6 +35,8 @@ public class NodePickerPanelTest {
     public void everyClosePathRefreshesPickerAndReopeningCreatesFreshContent() {
         WicketTester tester = new WicketTester();
         try {
+            tester.getApplication().getExceptionSettings().setNotRenderableErrorStrategy(
+                    ExceptionSettings.NotRenderableErrorStrategy.THROW_EXCEPTION);
             int[] updates = { 0 };
             RootTreeNode root = new RootTreeNode("test") {
                 @Override

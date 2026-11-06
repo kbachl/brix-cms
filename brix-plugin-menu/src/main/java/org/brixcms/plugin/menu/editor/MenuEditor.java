@@ -89,6 +89,9 @@ public class MenuEditor extends BrixGenericPanel<Menu> {
         });
 
         tree = tg.getTree();
+        // Keep the ID prefix for Ajax row updates, but the body has no HTML tag of its own.
+        tree.getMarkupId();
+        tree.setOutputMarkupId(false);
         tg.setClickRowToSelect(true);
         tg.setClickRowToDeselect(true);
         tg.setSelectToEdit(false);

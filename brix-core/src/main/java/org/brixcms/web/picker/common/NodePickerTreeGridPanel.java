@@ -128,6 +128,9 @@ public abstract class NodePickerTreeGridPanel extends Panel {
 
         configureGrid(grid);
         add(grid);
+        // Keep the ID prefix for Ajax row updates, but the body has no HTML tag of its own.
+        grid.getTree().getMarkupId();
+        grid.getTree().setOutputMarkupId(false);
     }
 
     protected AbstractTreeModel newTreeModel() {

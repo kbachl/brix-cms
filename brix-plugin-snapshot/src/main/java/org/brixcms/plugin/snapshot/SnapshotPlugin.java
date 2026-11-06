@@ -15,8 +15,8 @@
 package org.brixcms.plugin.snapshot;
 
 import java.text.DateFormat;
-import java.text.ParseException;
-import java.time.format.DateTimeFormatter;
+import java.text.ParsePosition;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 import org.apache.wicket.markup.html.panel.Panel;
@@ -127,28 +127,34 @@ public class SnapshotPlugin implements Plugin {
         return workspace.getAttribute(WORKSPACE_ATTRIBUTE_CREATED);
     }
 
-//    public Date getCreated(Workspace workspace) {
-//        String formatted = workspace.getAttribute(WORKSPACE_ATTRIBUTE_CREATED);
-//        if (formatted == null) {
-//            return null;
-//        } else {
-//            DateFormat df = DateFormat.getDateTimeInstance(DateFormat.LONG, DateFormat.LONG);
-//            Date date;
-//            try {
-//                date = df.parse(formatted);
-//                return date;
-//            } catch (ParseException e) {
-//                return new Date(); //fix null PE
-//            }
-//        }
-//    }
+    private Date getCreatedDate(Workspace workspace) {
+        String created = getCreated(workspace);
+        if (created == null) {
+            return null;
+        }
+        // shortcut: parse server and bundled UI locales; extend when importing dates from other locales.
+        created = created.replace('\u202f', ' ').replace('\u00a0', ' ');
+        for (Locale locale : Arrays.asList(Locale.getDefault(Locale.Category.FORMAT), Locale.ENGLISH,
+                Locale.GERMAN, Locale.forLanguageTag("cs"))) {
+            SimpleDateFormat format = (SimpleDateFormat) DateFormat.getDateTimeInstance(
+                    DateFormat.LONG, DateFormat.LONG, locale);
+            format.applyPattern(format.toPattern().replace('\u202f', ' ').replace('\u00a0', ' '));
+            format.setLenient(false);
+            ParsePosition position = new ParsePosition(0);
+            Date date = format.parse(created, position);
+            if (date != null && position.getIndex() == created.length()) {
+                return date;
+            }
+        }
+        return null;
+    }
 
     public List<Workspace> getSnapshotsForWorkspace(Workspace workspace) {
         String siteName = null;
 
-        if (SitePlugin.get().isSiteWorkspace(workspace)) {
-            siteName = SitePlugin.get().getWorkspaceName(workspace);
-        } else if (SnapshotPlugin.get().isSnapshotWorkspace(workspace)) {
+        if (SitePlugin.get(brix).isSiteWorkspace(workspace)) {
+            siteName = SitePlugin.get(brix).getWorkspaceName(workspace);
+        } else if (isSnapshotWorkspace(workspace)) {
             siteName = getSnapshotSiteName(workspace);
         }
 
@@ -156,7 +162,16 @@ public class SnapshotPlugin implements Plugin {
             Map<String, String> attributes = new HashMap<String, String>();
             attributes.put(Brix.WORKSPACE_ATTRIBUTE_TYPE, WORKSPACE_TYPE);
             attributes.put(WORKSPACE_ATTRIBUTE_SITE_NAME, siteName);
-            return brix.getWorkspaceManager().getWorkspacesFiltered(attributes);
+            List<Workspace> snapshots = new ArrayList<>(brix.getWorkspaceManager()
+                    .getWorkspacesFiltered(attributes));
+            Map<Workspace, Date> createdDates = new HashMap<>();
+            for (Workspace snapshot : snapshots) {
+                createdDates.put(snapshot, getCreatedDate(snapshot));
+            }
+            snapshots.sort(Comparator.<Workspace, Date>comparing(createdDates::get,
+                    Comparator.nullsLast(Comparator.reverseOrder()))
+                    .thenComparing(Workspace::getId));
+            return snapshots;
         } else {
             return Collections.emptyList();
         }

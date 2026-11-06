@@ -386,17 +386,30 @@ div.brix-admin div.brix-snapshots-container td {
 
 div.brix-admin div.brix-snapshots-caption {
     font-weight: bold;
-    padding-bottom: 0.2em;
+    padding-bottom: 0.5em;
 }
 
 div.brix-admin div.brix-snapshots-item {
-    border-top: 1px dotted #aaa;
-    padding: 0.3em;
+    border: 1px solid #cbd3dc;
+    border-left: 3px solid #7894BB;
+    border-radius: 0.25rem;
+    padding: 0.75em;
+    margin-bottom: 0.75em;
     background-color: #f9f9f9;
 }
 
+div.brix-admin .brix-snapshots-title {
+    display: block;
+}
+
+div.brix-admin div.brix-snapshots-comment:not(:empty) {
+    margin-top: 0.5em;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 div.brix-admin div.brix-snapshots-item div.brix-buttons-left {
-    margin-top: 0.3em;
+    margin-top: 0.75em;
 }
 
 div.brix-admin div.brix-snapshots-container td.brix-snapshots-actions {

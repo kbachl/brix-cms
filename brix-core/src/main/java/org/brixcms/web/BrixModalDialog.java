@@ -20,6 +20,8 @@ import org.apache.wicket.extensions.ajax.markup.html.modal.ModalDialog;
 import org.apache.wicket.markup.head.CssHeaderItem;
 import org.apache.wicket.markup.head.IHeaderResponse;
 import org.apache.wicket.markup.head.JavaScriptHeaderItem;
+import org.apache.wicket.markup.head.OnDomReadyHeaderItem;
+import org.apache.wicket.markup.head.PriorityHeaderItem;
 import org.apache.wicket.markup.html.WebMarkupContainer;
 import org.apache.wicket.markup.html.basic.Label;
 import org.apache.wicket.model.IModel;
@@ -57,5 +59,9 @@ public class BrixModalDialog extends ModalDialog {
         super.renderHead(response);
         response.render(CssHeaderItem.forReference(new CssResourceReference(BrixModalDialog.class, "BrixModalDialog.css")));
         response.render(JavaScriptHeaderItem.forReference(new JavaScriptResourceReference(BrixModalDialog.class, "BrixModalDialog.js")));
+        if (isOpen()) {
+            response.render(new PriorityHeaderItem(OnDomReadyHeaderItem.forScript(
+                    "BrixModalDialog.mount('" + getMarkupId() + "');")));
+        }
     }
 }

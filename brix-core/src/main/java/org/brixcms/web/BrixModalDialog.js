@@ -1,3 +1,27 @@
+window.BrixModalDialog = {
+    mount: function (id) {
+        const host = document.getElementById(id);
+        const overlay = host.querySelector(".brix-modal-overlay");
+        if (!overlay) {
+            return;
+        }
+        // Leave grid cells and their styles/events, but keep controls in their enclosing form.
+        const destination = host.closest("form") || document.body;
+        jQuery.event.special.brixModalRemove = {
+            remove: function (handle) { handle.handler(); }
+        };
+        jQuery(host).on("brixModalRemove", function () { jQuery(overlay).remove(); });
+        destination.appendChild(overlay);
+        requestAnimationFrame(function () {
+            const selected = overlay.querySelector(".node-picker tr.imxt-selected");
+            if (selected) {
+                const scroller = selected.closest(".imxt-body-container1");
+                scroller.scrollTop += selected.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+            }
+        });
+    }
+};
+
 // shortcut: Wicket 10.9.1 calls .trigger() on DOM nodes at Tab boundaries; remove when TrapFocusBehavior is fixed.
 document.addEventListener("keydown", function (event) {
     if (event.key !== "Tab") {

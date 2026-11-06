@@ -50,6 +50,7 @@ and `getContentId`. Override `close(AjaxRequestTarget)` for close notifications,
 position-cookie APIs are gone. Existing serialized Wicket pages must be discarded when upgrading.
 
 Run the additional keyboard regression check with `node brix-core/src/test/js/modal-dialog-focus-test.cjs`.
+Run the dialog placement and selection check with `node brix-core/src/test/js/modal-dialog-mount-test.cjs`.
 
 Community
 ---------

@@ -21,6 +21,7 @@ const disabled = element('disabled', { matches: () => true });
 const overlay = element('overlay', { querySelectorAll: () => [first, middle, last, hidden, disabled] });
 
 vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../../main/java/org/brixcms/web/BrixModalDialog.js'), 'utf8'), {
+    window: {},
     document: { addEventListener(type, handler, capture) {
         assert.equal(type, 'keydown');
         assert.equal(capture, true);
